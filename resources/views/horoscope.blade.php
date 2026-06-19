@@ -49,6 +49,20 @@
                                 <label class="block text-sm font-medium text-gray-700" for="natalTime">Idő</label>
                                 <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="natalTime" step="60">
                             </div>
+
+                            <div class="mb-3">
+                                <div class="block text-sm font-medium text-gray-700">Idő léptetése</div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-60">-1 perc</button>
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="60">+1 perc</button>
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-3600">-1 óra</button>
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="3600">+1 óra</button>
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-86400">-1 nap</button>
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="86400">+1 nap</button>
+                                    <button class="px-3 py-1.5 rounded bg-gray-900 text-white" type="button" id="setNow">Most</button>
+                                </div>
+                                <div class="mt-1 text-xs text-gray-500">A léptetés a Natal dátum/időt módosítja (offset figyelembevételével) és azonnal újraszámol.</div>
+                            </div>
                             <div class="mb-3">
                                 <label class="block text-sm font-medium text-gray-700" for="natalQuery">Hely (település / cím)</label>
                                 <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="text" id="natalQuery" placeholder="pl. Budapest">
@@ -216,6 +230,46 @@
                 natalInputs.time.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
                 transitInputs.date.value = natalInputs.date.value;
                 transitInputs.time.value = natalInputs.time.value;
+            }
+
+            function localToUtcMs(dateStr, timeStr, offsetHours) {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const [hour, minute] = timeStr.split(':').map(Number);
+
+                const localMs = Date.UTC(year, month - 1, day, hour, minute);
+                return localMs - offsetHours * 60 * 60 * 1000;
+            }
+
+            function utcMsToLocalInputs(utcMs, offsetHours) {
+                const localMs = utcMs + offsetHours * 60 * 60 * 1000;
+                const dt = new Date(localMs);
+
+                const pad = (v) => String(v).padStart(2, '0');
+                const date = `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+                const time = `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`;
+                return { date, time };
+            }
+
+            function shiftNatalTimeBySeconds(deltaSeconds) {
+                const err = validateInputs(natalInputs);
+                if (err) {
+                    errorBox.textContent = err;
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const offset = Number(natalInputs.offset.value);
+                const utcMs = localToUtcMs(natalInputs.date.value, natalInputs.time.value, offset);
+                const nextUtcMs = utcMs + deltaSeconds * 1000;
+                const nextLocal = utcMsToLocalInputs(nextUtcMs, offset);
+
+                natalInputs.date.value = nextLocal.date;
+                natalInputs.time.value = nextLocal.time;
+                // tranzit defaultban kövesse a natalt
+                transitInputs.date.value = nextLocal.date;
+                transitInputs.time.value = nextLocal.time;
+
+                calculate();
             }
 
             function setDefaultCoords() {
@@ -830,6 +884,9 @@
             setDefaultCoords();
             updateModeHint();
 
+            // Betöltéskor azonnali számítás az aktuális időpontra
+            calculate();
+
             // Kezdő állapot: klasszikus kerék alap (ASC-rotáció nélkül), hogy ne legyen üres az ábra.
             // A "Számítás" után a teljes kerék ASC szerint elforgatva jelenik meg.
             clearChart();
@@ -848,5 +905,31 @@
             });
             showNatalCheckbox.addEventListener('change', calculate);
             showTransitCheckbox.addEventListener('change', calculate);
+
+            // kézi idő módosítás esetén is számoljunk újra
+            [
+                natalInputs.date,
+                natalInputs.time,
+                natalInputs.offset,
+                transitInputs.date,
+                transitInputs.time,
+                transitInputs.offset,
+            ].forEach((el) => {
+                el.addEventListener('change', calculate);
+            });
+
+            // léptető gombok
+            document.querySelectorAll('[data-step]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const delta = Number(btn.getAttribute('data-step'));
+                    if (!Number.isFinite(delta)) return;
+                    shiftNatalTimeBySeconds(delta);
+                });
+            });
+
+            document.getElementById('setNow').addEventListener('click', () => {
+                setDefaultTimes();
+                calculate();
+            });
     </script>
 </x-app-layout>
