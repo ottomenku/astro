@@ -82,7 +82,15 @@ class HoroscopeController extends Controller
         ];
 
         $script = base_path('python/horoscope_calc.py');
-        $python = (string) env('HOROSCOPE_PYTHON_BIN', 'python3');
+        $defaultPython = PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3';
+        $pythonFromEnv = (string) env('HOROSCOPE_PYTHON_BIN', '');
+        // Windows alatt gyakran van külön "python3" shim (pl. Store), amiben nincs telepítve a swisseph.
+        // Ha a .env-ben nincs explicit bin megadva, vagy valaki python3-at állított be, akkor is inkább a "python"-t használjuk.
+        if (PHP_OS_FAMILY === 'Windows' && ($pythonFromEnv === '' || $pythonFromEnv === 'python3')) {
+            $python = 'python';
+        } else {
+            $python = $pythonFromEnv !== '' ? $pythonFromEnv : $defaultPython;
+        }
         $process = new Process([$python, $script]);
         $process->setTimeout(30);
         $process->setInput(json_encode($payload));
@@ -92,6 +100,8 @@ class HoroscopeController extends Controller
 
             if (! $process->isSuccessful()) {
                 Log::error('Horoscope calc failed', [
+                    'python' => $python,
+                    'script' => $script,
                     'error' => $process->getErrorOutput(),
                     'output' => $process->getOutput(),
                 ]);
@@ -99,6 +109,7 @@ class HoroscopeController extends Controller
                 return response()->json([
                     'error' => 'A horoszkóp számítás sikertelen.',
                     'details' => $process->getErrorOutput(),
+                    'python' => $python,
                 ], 500);
             }
 

@@ -860,7 +860,10 @@
                     }
                 } catch (error) {
                     console.error('Horoscope calculate failed:', error);
-                    errorBox.textContent = error.message;
+                    const msg = error?.message || 'Ismeretlen hiba';
+                    const details = error?.details ? `\n\n${error.details}` : '';
+                    const python = error?.python ? `\n\nPython: ${error.python}` : '';
+                    errorBox.textContent = `${msg}${python}${details}`;
                     errorBox.classList.remove('hidden');
                 } finally {
                     calcButton.disabled = false;
