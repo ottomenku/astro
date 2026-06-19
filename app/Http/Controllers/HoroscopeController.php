@@ -78,7 +78,7 @@ class HoroscopeController extends Controller
             'sidereal' => (bool) ($validated['sidereal'] ?? false),
             // csak akkor értelmes, ha sidereal=true
             'ayanamsa' => $validated['ayanamsa'] ?? 'lahiri',
-            'house_system' => $validated['house_system'] ?? 'whole_sign',
+            'house_system' => $validated['house_system'] ?? 'placidus',
         ];
 
         $script = base_path('python/horoscope_calc.py');

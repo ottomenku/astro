@@ -24,8 +24,8 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700" for="houseSystem">Házrendszer</label>
                                     <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="houseSystem">
-                                        <option value="whole_sign" selected>Whole Sign</option>
-                                        <option value="placidus">Placidus</option>
+                                        <option value="whole_sign">Whole Sign</option>
+                                        <option value="placidus" selected>Placidus</option>
                                     </select>
                                 </div>
                                 <div>
@@ -599,23 +599,13 @@
                     const r = (CHART.rHouseOuter + CHART.rHouseInner) / 2;
                     const point = polarToCartesian(normalizeAngle(mid + rotationDeg), r);
 
-                    // háttér, hogy bolygó se takarja
-                    const bg = svgEl('circle');
-                    bg.setAttribute('cx', point.x);
-                    bg.setAttribute('cy', point.y);
-                    bg.setAttribute('r', '9');
-                    bg.setAttribute('fill', '#fff');
-                    bg.setAttribute('opacity', '0.92');
-                    bg.setAttribute('stroke', '#dc3545');
-                    bg.setAttribute('stroke-width', '1');
-                    layer.appendChild(bg);
-
                     const label = svgEl('text');
                     label.setAttribute('x', point.x);
                     label.setAttribute('y', point.y);
                     label.setAttribute('text-anchor', 'middle');
                     label.setAttribute('dominant-baseline', 'middle');
-                    label.setAttribute('font-size', '12');
+                    // 50%-kal kisebb
+                    label.setAttribute('font-size', '6');
                     label.setAttribute('fill', '#dc3545');
                     label.setAttribute('font-weight', '600');
                     label.textContent = String(i + 1);
@@ -647,8 +637,8 @@
                 text.setAttribute('font-size', '10');
                 text.setAttribute('fill', def.color);
                 text.setAttribute('font-weight', '700');
-                // jel + fok (különben a 60 és 120 azonos lenne)
-                text.textContent = `${def.mark}${def.angle}`;
+                // csak jel (nincs fokszám)
+                text.textContent = `${def.mark}`;
                 layer.appendChild(text);
             }
 
@@ -768,19 +758,21 @@
             function getPlanetStyle(name) {
                 // Alap
                 const style = {
-                    size: 14,
+                    // bolygók +50%
+                    size: 21,
                     stroke: '#111',
                     haloFill: '#fff',
                     haloOpacity: 0.92,
-                    haloR: 12,
+                    haloR: 14,
                     strokeWidth: 2,
                 };
 
                 switch (name) {
                     case 'Sun':
-                        return { ...style, size: 18, stroke: '#f59e0b', haloFill: '#fff', haloOpacity: 0.95, haloR: 13 };
+                        // Nap +100% az alaphoz képest
+                        return { ...style, size: 42, stroke: '#f59e0b', haloFill: '#fff', haloOpacity: 0.95, haloR: 17 };
                     case 'Moon':
-                        return { ...style, size: 16, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95, haloR: 13 };
+                        return { ...style, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95 };
                     case 'Mars':
                         return { ...style, stroke: '#dc2626' };
                     case 'Venus':
@@ -813,6 +805,9 @@
                 halo.setAttribute('r', String(style.haloR));
                 halo.setAttribute('fill', style.haloFill);
                 halo.setAttribute('opacity', String(style.haloOpacity));
+                // vékony fekete kör a bolygó körül
+                halo.setAttribute('stroke', '#111');
+                halo.setAttribute('stroke-width', '1');
                 g.appendChild(halo);
 
                 paths.forEach((d) => {
