@@ -8,19 +8,30 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="lg:col-span-5">
-                    <div class="bg-white shadow-sm rounded-lg">
-                        <div class="p-6 space-y-4">
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="zodiacMode">Zodiákus</label>
-                                <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="zodiacMode">
-                                    <option value="tropical" selected>Trópusi (0° Kos = tavaszpont)</option>
-                                    <option value="sidereal">Sziderikus (Lahiri)</option>
-                                </select>
-                            </div>
+            <div class="bg-white shadow-sm rounded-lg">
+                <div class="p-6">
+                    <div class="flex flex-wrap gap-2 border-b pb-3">
+                        <button type="button" class="px-3 py-2 rounded bg-indigo-600 text-white" data-tab="chart" id="tabChart">Ábra</button>
+                        <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="table" id="tabTable">Táblázat</button>
+                        <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="aspects" id="tabAspects">Fényszögek</button>
+                    </div>
 
-                            <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div class="mt-4" id="panelChart">
+                        <h3 class="font-semibold mb-3">Horoszkóp ábra</h3>
+                        <div class="max-w-xl mx-auto" id="chartShell">
+                            <svg class="w-full h-auto" viewBox="0 0 400 400" role="img" aria-label="Horoszkóp kerék" id="chartSvg"></svg>
+                        </div>
+
+                        <div class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            <div class="lg:col-span-5 space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700" for="zodiacMode">Zodiákus</label>
+                                    <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="zodiacMode">
+                                        <option value="tropical" selected>Trópusi (0° Kos = tavaszpont)</option>
+                                        <option value="sidereal">Sziderikus (Lahiri)</option>
+                                    </select>
+                                </div>
+
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700" for="houseSystem">Házrendszer</label>
                                     <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="houseSystem">
@@ -28,123 +39,83 @@
                                         <option value="placidus" selected>Placidus</option>
                                     </select>
                                 </div>
+
                                 <div>
-                                    <div class="block text-sm font-medium text-gray-700">Megjelenítés</div>
-                                    <label class="mt-2 flex items-center gap-2 text-sm">
-                                        <input class="rounded border-gray-300" type="checkbox" id="showNatal" checked>
-                                        <span>Natal</span>
-                                    </label>
-                                    <label class="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                                        <input class="rounded border-gray-300" type="checkbox" id="showTransit" disabled>
-                                        <span>Tranzit (később)</span>
-                                    </label>
+                                    <div class="block text-sm font-medium text-gray-700">Dátum / idő (alap: most)</div>
+                                    <div class="grid grid-cols-2 gap-2 mt-2">
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-500" for="natalDate">Dátum</label>
+                                            <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="date" id="natalDate">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-500" for="natalTime">Idő</label>
+                                            <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="natalTime" step="60">
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <label class="block text-xs font-medium text-gray-500" for="natalOffset">Időzóna offset (óra, pl. +2)</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.25" id="natalOffset" value="2">
+                                    </div>
                                 </div>
-                            </div>
-                            <h2 class="text-xs font-semibold uppercase text-gray-500">Natal adatok</h2>
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="natalDate">Dátum</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="date" id="natalDate">
-                            </div>
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="natalTime">Idő</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="natalTime" step="60">
+
+                                <div>
+                                    <div class="block text-sm font-medium text-gray-700">Idő léptetése</div>
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-60">-1 perc</button>
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="60">+1 perc</button>
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-3600">-1 óra</button>
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="3600">+1 óra</button>
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-86400">-1 nap</button>
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="86400">+1 nap</button>
+                                        <button class="px-3 py-1.5 rounded bg-gray-900 text-white" type="button" id="setNow">Most</button>
+                                    </div>
+                                    <div class="mt-1 text-xs text-gray-500">Perc / óra / nap léptetés, azonnali újraszámolással.</div>
+                                </div>
                             </div>
 
-                            <div class="mb-3">
-                                <div class="block text-sm font-medium text-gray-700">Idő léptetése</div>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-60">-1 perc</button>
-                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="60">+1 perc</button>
-                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-3600">-1 óra</button>
-                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="3600">+1 óra</button>
-                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-86400">-1 nap</button>
-                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="86400">+1 nap</button>
-                                    <button class="px-3 py-1.5 rounded bg-gray-900 text-white" type="button" id="setNow">Most</button>
+                            <div class="lg:col-span-7 space-y-4">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700" for="natalLat">Szélesség (lat)</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLat" value="47.4979">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700" for="natalLon">Hosszúság (lon)</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLon" value="19.0402">
+                                    </div>
                                 </div>
-                                <div class="mt-1 text-xs text-gray-500">A léptetés a Natal dátum/időt módosítja (offset figyelembevételével) és azonnal újraszámol.</div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="natalQuery">Hely (település / cím)</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="text" id="natalQuery" placeholder="pl. Budapest">
-                                <div class="mt-2 hidden border border-gray-200 rounded-md divide-y" id="natalResults"></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="natalLat">Szélesség (lat)</label>
-                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLat" value="47.4979">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="natalLon">Hosszúság (lon)</label>
-                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLon" value="19.0402">
-                                </div>
-                            </div>
-                            <div class="mt-2 mb-4">
-                                <label class="block text-sm font-medium text-gray-700" for="natalOffset">Időzóna offset (óra, pl. +2)</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.25" id="natalOffset" value="2">
-                            </div>
 
-                            <h2 class="text-xs font-semibold uppercase text-gray-500">Tranzit adatok</h2>
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="transitDate">Dátum</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="date" id="transitDate">
-                            </div>
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="transitTime">Idő</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="transitTime" step="60">
-                            </div>
-                            <div class="mb-3">
-                                <label class="block text-sm font-medium text-gray-700" for="transitQuery">Hely (település / cím)</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="text" id="transitQuery" placeholder="pl. Budapest">
-                                <div class="mt-2 hidden border border-gray-200 rounded-md divide-y" id="transitResults"></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="transitLat">Szélesség (lat)</label>
-                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="transitLat" value="47.4979">
+                                    <label class="block text-sm font-medium text-gray-700" for="natalQuery">Hely (település / cím)</label>
+                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="text" id="natalQuery" placeholder="pl. Budapest">
+                                    <div class="mt-2 hidden border border-gray-200 rounded-md divide-y" id="natalResults"></div>
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="transitLon">Hosszúság (lon)</label>
-                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="transitLon" value="19.0402">
+
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <button class="px-3 py-2 rounded bg-indigo-600 text-white" type="button" id="calcButton">Számítás</button>
                                 </div>
-                            </div>
-                            <div class="mt-2">
-                                <label class="block text-sm font-medium text-gray-700" for="transitOffset">Időzóna offset (óra, pl. +2)</label>
-                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.25" id="transitOffset" value="2">
-                            </div>
-
-                            <div class="flex flex-col sm:flex-row gap-2 mt-4">
-                                <button class="px-3 py-2 rounded border border-gray-300" type="button" id="copyNatal">Natal → tranzit</button>
-                                <button class="px-3 py-2 rounded bg-indigo-600 text-white" type="button" id="calcButton">Számítás</button>
-                            </div>
-                            <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800" id="errorBox"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-7 space-y-6">
-                    <div class="bg-white shadow-sm rounded-lg">
-                        <div class="p-6">
-                            <h3 class="font-semibold mb-3">Horoszkóp kerék</h3>
-                            <div class="max-w-xl mx-auto" id="chartShell">
-                                <svg class="w-full h-auto" viewBox="0 0 400 400" role="img" aria-label="Horoszkóp kerék" id="chartSvg"></svg>
+                                <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-white shadow-sm rounded-lg">
-                        <div class="p-6">
-                            <h3 class="font-semibold mb-3">Bolygó pozíciók</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <div class="text-sm text-gray-500 uppercase mb-2">Natal</div>
-                                    <div id="natalTable"></div>
-                                </div>
-                                <div>
-                                    <div class="text-sm text-gray-500 uppercase mb-2">Tranzit</div>
-                                    <div id="transitTable"></div>
-                                </div>
+                    <div class="mt-4 hidden" id="panelTable">
+                        <h3 class="font-semibold mb-3">Bolygó pozíciók</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div class="text-sm text-gray-500 uppercase mb-2">Natal</div>
+                                <div id="natalTable"></div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500 uppercase mb-2">Tranzit</div>
+                                <div id="transitTable"></div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mt-4 hidden" id="panelAspects">
+                        <h3 class="font-semibold mb-3">Fényszögek</h3>
+                        <div id="aspectsTable"></div>
                     </div>
                 </div>
             </div>
@@ -168,26 +139,36 @@
                 offset: document.getElementById('natalOffset'),
             };
 
+            // Transit UI (később): jelenleg a tranzit automatikusan a natal adatokkal azonos.
             const transitInputs = {
-                date: document.getElementById('transitDate'),
-                time: document.getElementById('transitTime'),
-                query: document.getElementById('transitQuery'),
-                results: document.getElementById('transitResults'),
-                lat: document.getElementById('transitLat'),
-                lon: document.getElementById('transitLon'),
-                offset: document.getElementById('transitOffset'),
+                date: natalInputs.date,
+                time: natalInputs.time,
+                query: natalInputs.query,
+                results: natalInputs.results,
+                lat: natalInputs.lat,
+                lon: natalInputs.lon,
+                offset: natalInputs.offset,
             };
 
             const errorBox = document.getElementById('errorBox');
             const calcButton = document.getElementById('calcButton');
-            const copyButton = document.getElementById('copyNatal');
+            // régi "Natal → tranzit" gomb már nincs a tabos UI-ban
+            const copyButton = null;
             const chartSvg = document.getElementById('chartSvg');
             const natalTable = document.getElementById('natalTable');
             const transitTable = document.getElementById('transitTable');
             const zodiacModeSelect = document.getElementById('zodiacMode');
             const houseSystemSelect = document.getElementById('houseSystem');
-            const showNatalCheckbox = document.getElementById('showNatal');
-            const showTransitCheckbox = document.getElementById('showTransit');
+            // jelenleg csak natal réteg van a keréken
+            const showNatalCheckbox = { checked: true, addEventListener: () => {} };
+            const showTransitCheckbox = { checked: false, addEventListener: () => {} };
+            const aspectsTable = document.getElementById('aspectsTable');
+            const tabChart = document.getElementById('tabChart');
+            const tabTable = document.getElementById('tabTable');
+            const tabAspects = document.getElementById('tabAspects');
+            const panelChart = document.getElementById('panelChart');
+            const panelTable = document.getElementById('panelTable');
+            const panelAspects = document.getElementById('panelAspects');
             const modeHint = document.getElementById('modeHint');
 
             const planetsOrder = [
@@ -232,6 +213,52 @@
                 natalInputs.time.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
                 transitInputs.date.value = natalInputs.date.value;
                 transitInputs.time.value = natalInputs.time.value;
+            }
+
+            function setActiveTab(name) {
+                const btnOn = 'px-3 py-2 rounded bg-indigo-600 text-white';
+                const btnOff = 'px-3 py-2 rounded border border-gray-300';
+
+                tabChart.className = name === 'chart' ? btnOn : btnOff;
+                tabTable.className = name === 'table' ? btnOn : btnOff;
+                tabAspects.className = name === 'aspects' ? btnOn : btnOff;
+
+                panelChart.classList.toggle('hidden', name !== 'chart');
+                panelTable.classList.toggle('hidden', name !== 'table');
+                panelAspects.classList.toggle('hidden', name !== 'aspects');
+            }
+            function renderAspectsTable(target, planets) {
+                const aspects = calcAspects(planets)
+                    .slice()
+                    .sort((a, b) => a.def.angle - b.def.angle || a.orb - b.orb);
+
+                if (!aspects.length) {
+                    target.innerHTML = '<div class="text-sm text-gray-500">Nincs találat a jelenlegi orbis beállítással.</div>';
+                    return;
+                }
+
+                const rows = aspects
+                    .map(
+                        ({ p1, p2, def }) => `<tr>
+                            <td class="py-2 pr-4">${p1.name}</td>
+                            <td class="py-2 pr-4 font-semibold" style="color:${def.color}">${def.mark}</td>
+                            <td class="py-2">${p2.name}</td>
+                        </tr>`
+                    )
+                    .join('');
+
+                target.innerHTML = `<div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left border-b">
+                                <th class="py-2 pr-4">Bolygó</th>
+                                <th class="py-2 pr-4">Jel</th>
+                                <th class="py-2">Bolygó</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">${rows}</tbody>
+                    </table>
+                </div>`;
             }
 
             function localToUtcMs(dateStr, timeStr, offsetHours) {
@@ -770,7 +797,8 @@
                 switch (name) {
                     case 'Sun':
                         // Nap +100% az alaphoz képest
-                        return { ...style, size: 42, stroke: '#f59e0b', haloFill: '#fff', haloOpacity: 0.95, haloR: 17 };
+                        // A Nap körvonala ne legyen nagyobb a jelénél
+                        return { ...style, size: 42, stroke: '#f59e0b', haloFill: '#fff', haloOpacity: 0.95, haloR: 11 };
                     case 'Moon':
                         return { ...style, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95 };
                     case 'Mars':
@@ -914,8 +942,10 @@
 
                     if (showNatalCheckbox.checked) {
                         renderTable(natalTable, data.natal.planets);
+                        renderAspectsTable(aspectsTable, data.natal.planets);
                     } else {
                         natalTable.innerHTML = '';
+                        aspectsTable.innerHTML = '';
                     }
                     if (showTransitCheckbox.checked) {
                         renderTable(transitTable, data.transit.planets);
@@ -952,18 +982,11 @@
                 }
             }
 
-            copyButton.addEventListener('click', () => {
-                transitInputs.date.value = natalInputs.date.value;
-                transitInputs.time.value = natalInputs.time.value;
-                transitInputs.lat.value = natalInputs.lat.value;
-                transitInputs.lon.value = natalInputs.lon.value;
-                transitInputs.offset.value = natalInputs.offset.value;
-                transitInputs.query.value = natalInputs.query.value;
-            });
+            // nincs külön transit UI, a tranzit a natalt követi
 
             calcButton.addEventListener('click', calculate);
             attachGeocode(natalInputs);
-            attachGeocode(transitInputs);
+            // nincs külön transit UI
             setDefaultTimes();
             setDefaultCoords();
             updateModeHint();
@@ -987,8 +1010,7 @@
                 updateModeHint();
                 calculate();
             });
-            showNatalCheckbox.addEventListener('change', calculate);
-            showTransitCheckbox.addEventListener('change', calculate);
+            // jelenleg nincs show/hide kapcsoló
 
             // kézi idő módosítás esetén is számoljunk újra
             [
@@ -1015,5 +1037,11 @@
                 setDefaultTimes();
                 calculate();
             });
+
+            // Tab kezelés
+            tabChart.addEventListener('click', () => setActiveTab('chart'));
+            tabTable.addEventListener('click', () => setActiveTab('table'));
+            tabAspects.addEventListener('click', () => setActiveTab('aspects'));
+            setActiveTab('chart');
     </script>
 </x-app-layout>
