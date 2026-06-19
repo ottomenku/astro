@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
+
+class OpenAIClient
+{
+    private function http(): PendingRequest
+    {
+        $apiKey = (string) config('services.openai.api_key');
+
+        return Http::withToken($apiKey)
+            ->acceptJson()
+            ->asJson()
+            ->timeout(60);
+    }
+
+    /**
+     * Minimal OpenAI Chat Completions call.
+     *
+     * @param  array<int, array{role:string, content:string}>  $messages
+     */
+    public function chat(array $messages, ?string $model = null): Response
+    {
+        $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
+        $model = $model ?: (string) config('services.openai.model', 'gpt-4o-mini');
+
+        return $this->http()->post($baseUrl.'/chat/completions', [
+            'model' => $model,
+            'messages' => $messages,
+        ]);
+    }
+}
