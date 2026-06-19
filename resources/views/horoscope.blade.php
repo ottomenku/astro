@@ -207,11 +207,13 @@
             const signSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
 
             const aspectDefs = [
-                { name: 'conjunction', angle: 0, color: '#6c757d' },
-                { name: 'sextile', angle: 60, color: '#0dcaf0' },
-                { name: 'square', angle: 90, color: '#dc3545' },
-                { name: 'trine', angle: 120, color: '#198754' },
-                { name: 'opposition', angle: 180, color: '#fd7e14' },
+                { name: 'conjunction', angle: 0, color: '#6c757d', mark: '☌' },
+                // kérés szerint 60°: háromszög
+                { name: 'sextile', angle: 60, color: '#0dcaf0', mark: '△' },
+                // kérés szerint 90°: négyzet
+                { name: 'square', angle: 90, color: '#dc3545', mark: '□' },
+                { name: 'trine', angle: 120, color: '#198754', mark: '△' },
+                { name: 'opposition', angle: 180, color: '#fd7e14', mark: '☍' },
             ];
 
             function updateModeHint() {
@@ -491,6 +493,12 @@
                 const planets = svgEl('g');
                 planets.setAttribute('data-layer', 'planets');
                 chartSvg.appendChild(planets);
+
+                // címkék (mindig legfelül): házszámok, fényszög jelölések
+                const labels = svgEl('g');
+                labels.setAttribute('data-layer', 'labels');
+                labels.setAttribute('style', 'pointer-events: none;');
+                chartSvg.appendChild(labels);
             }
 
             function getLayer(name) {
@@ -583,11 +591,25 @@
             }
 
             function drawHouseNumbersFromCusps(cusps, rotationDeg) {
-                const layer = getLayer('houses');
+                const layer = getLayer('labels');
                 if (!layer) return;
                 for (let i = 0; i < 12; i++) {
                     const mid = angleMid(cusps[i], cusps[(i + 1) % 12]);
-                    const point = polarToCartesian(normalizeAngle(mid + rotationDeg), 154);
+                    // a ház-gyűrűben legyen (ne a zodiákus gyűrűben)
+                    const r = (CHART.rHouseOuter + CHART.rHouseInner) / 2;
+                    const point = polarToCartesian(normalizeAngle(mid + rotationDeg), r);
+
+                    // háttér, hogy bolygó se takarja
+                    const bg = svgEl('circle');
+                    bg.setAttribute('cx', point.x);
+                    bg.setAttribute('cy', point.y);
+                    bg.setAttribute('r', '9');
+                    bg.setAttribute('fill', '#fff');
+                    bg.setAttribute('opacity', '0.92');
+                    bg.setAttribute('stroke', '#dc3545');
+                    bg.setAttribute('stroke-width', '1');
+                    layer.appendChild(bg);
+
                     const label = svgEl('text');
                     label.setAttribute('x', point.x);
                     label.setAttribute('y', point.y);
@@ -595,9 +617,39 @@
                     label.setAttribute('dominant-baseline', 'middle');
                     label.setAttribute('font-size', '12');
                     label.setAttribute('fill', '#dc3545');
+                    label.setAttribute('font-weight', '600');
                     label.textContent = String(i + 1);
                     layer.appendChild(label);
                 }
+            }
+
+            function drawAspectMark(def, a, b) {
+                const layer = getLayer('labels');
+                if (!layer) return;
+                const mx = (a.x + b.x) / 2;
+                const my = (a.y + b.y) / 2;
+
+                const bg = svgEl('circle');
+                bg.setAttribute('cx', mx);
+                bg.setAttribute('cy', my);
+                bg.setAttribute('r', '10');
+                bg.setAttribute('fill', '#fff');
+                bg.setAttribute('opacity', '0.9');
+                bg.setAttribute('stroke', def.color);
+                bg.setAttribute('stroke-width', '1');
+                layer.appendChild(bg);
+
+                const text = svgEl('text');
+                text.setAttribute('x', mx);
+                text.setAttribute('y', my);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('fill', def.color);
+                text.setAttribute('font-weight', '700');
+                // jel + fok (különben a 60 és 120 azonos lenne)
+                text.textContent = `${def.mark}${def.angle}`;
+                layer.appendChild(text);
             }
 
             function smallestAngleDiff(a, b) {
@@ -643,9 +695,11 @@
                     line.setAttribute('x2', b.x);
                     line.setAttribute('y2', b.y);
                     line.setAttribute('stroke', def.color);
-                    line.setAttribute('stroke-width', '1');
+                    line.setAttribute('stroke-width', '2.2');
                     line.setAttribute('opacity', String(strokeOpacity));
                     layer.appendChild(line);
+
+                    drawAspectMark(def, a, b);
                 });
             }
 
@@ -711,31 +765,62 @@
                 ],
             };
 
-            function drawPlanetGlyph(name, x, y, size, stroke) {
+            function getPlanetStyle(name) {
+                // Alap
+                const style = {
+                    size: 14,
+                    stroke: '#111',
+                    haloFill: '#fff',
+                    haloOpacity: 0.92,
+                    haloR: 12,
+                    strokeWidth: 2,
+                };
+
+                switch (name) {
+                    case 'Sun':
+                        return { ...style, size: 18, stroke: '#f59e0b', haloFill: '#fff', haloOpacity: 0.95, haloR: 13 };
+                    case 'Moon':
+                        return { ...style, size: 16, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95, haloR: 13 };
+                    case 'Mars':
+                        return { ...style, stroke: '#dc2626' };
+                    case 'Venus':
+                        return { ...style, stroke: '#2563eb' };
+                    case 'Jupiter':
+                        return { ...style, stroke: '#111' };
+                    case 'Saturn':
+                        return { ...style, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95 };
+                    case 'Mercury':
+                        return { ...style, stroke: '#16a34a' };
+                    default:
+                        return style;
+                }
+            }
+
+            function drawPlanetGlyph(name, x, y, style) {
                 const layer = getLayer('planets');
                 if (!layer) return;
                 const paths = planetGlyphPaths[name];
                 if (!paths) return;
 
                 const g = svgEl('g');
-                const scale = size / 28;
+                const scale = style.size / 28;
                 g.setAttribute('transform', `translate(${x} ${y}) scale(${scale})`);
 
                 // háttér “halo”, hogy olvasható legyen a vonal a keréken
                 const halo = svgEl('circle');
                 halo.setAttribute('cx', '0');
                 halo.setAttribute('cy', '0');
-                halo.setAttribute('r', '12');
-                halo.setAttribute('fill', '#fff');
-                halo.setAttribute('opacity', '0.9');
+                halo.setAttribute('r', String(style.haloR));
+                halo.setAttribute('fill', style.haloFill);
+                halo.setAttribute('opacity', String(style.haloOpacity));
                 g.appendChild(halo);
 
                 paths.forEach((d) => {
                     const p = svgEl('path');
                     p.setAttribute('d', d);
                     p.setAttribute('fill', 'none');
-                    p.setAttribute('stroke', stroke);
-                    p.setAttribute('stroke-width', '2');
+                    p.setAttribute('stroke', style.stroke);
+                    p.setAttribute('stroke-width', String(style.strokeWidth));
                     p.setAttribute('stroke-linecap', 'round');
                     p.setAttribute('stroke-linejoin', 'round');
                     g.appendChild(p);
@@ -756,6 +841,7 @@
                 let lastAngle = null;
                 let level = 0;
                 sorted.forEach((planet) => {
+                    const style = getPlanetStyle(planet.name);
                     const angle = normalizeAngle(planet.longitude + rotationDeg);
                     if (lastAngle !== null && smallestAngleDiff(angle, lastAngle) < 8) {
                         level = (level + 1) % 3;
@@ -772,10 +858,10 @@
                     dot.setAttribute('cx', point.x);
                     dot.setAttribute('cy', point.y);
                     dot.setAttribute('r', '2.5');
-                    dot.setAttribute('fill', '#111');
+                    dot.setAttribute('fill', style.stroke);
                     layer.appendChild(dot);
 
-                    drawPlanetGlyph(planet.name, point.x, point.y, 14, '#111');
+                    drawPlanetGlyph(planet.name, point.x, point.y, style);
                 });
             }
 
