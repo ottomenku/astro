@@ -18,6 +18,11 @@ class ChatService
     {
         $this->ensureQuota($user);
 
+        $apiKey = (string) config('services.openai.api_key');
+        if (trim($apiKey) === '') {
+            throw new \RuntimeException('Hiányzik az OPENAI_API_KEY (.env).');
+        }
+
         $response = $this->client->chat([
             ['role' => 'system', 'content' => 'Te egy asztrológiai asszisztens vagy. Válaszolj magyarul, tömören és érthetően.'],
             ['role' => 'user', 'content' => $prompt],
@@ -29,6 +34,13 @@ class ChatService
                 'body' => $response->body(),
             ]);
 
+            // adjon értelmezhetőbb hibát a kliensnek
+            if ($response->status() === 401) {
+                throw new \RuntimeException('OpenAI hitelesítés sikertelen (401). Ellenőrizd az OPENAI_API_KEY-t.');
+            }
+            if ($response->status() === 429) {
+                throw new \RuntimeException('OpenAI rate limit / kvóta hiba (429).');
+            }
             throw new \RuntimeException('OpenAI hívás sikertelen.');
         }
 
