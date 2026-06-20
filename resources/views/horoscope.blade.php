@@ -11,7 +11,7 @@
             <div class="bg-white shadow-sm rounded-lg">
                 <div class="p-6">
                     <div class="flex flex-wrap gap-2 border-b pb-3">
-                        <button type="button" class="px-3 py-2 rounded bg-indigo-600 text-white" data-tab="chart" id="tabChart">Ábra</button>
+                        <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="chart" id="tabChart">Ábra</button>
                         <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="table" id="tabTable">Táblázat</button>
                         <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="aspects" id="tabAspects">Fényszögek</button>
                     </div>
@@ -20,82 +20,194 @@
                         <h3 class="font-semibold mb-3">Horoszkóp ábra</h3>
                         <div class="max-w-xl mx-auto" id="chartShell">
                             <svg class="w-full h-auto" viewBox="0 0 400 400" role="img" aria-label="Horoszkóp kerék" id="chartSvg"></svg>
+                            <div id="selectionBox" class="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2 hidden"></div>
                         </div>
 
-                        <div class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-                            <div class="lg:col-span-5 space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="zodiacMode">Zodiákus</label>
-                                    <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="zodiacMode">
-                                        <option value="tropical" selected>Trópusi (0° Kos = tavaszpont)</option>
-                                        <option value="sidereal">Sziderikus (Lahiri)</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="houseSystem">Házrendszer</label>
-                                    <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="houseSystem">
-                                        <option value="whole_sign">Whole Sign</option>
-                                        <option value="placidus" selected>Placidus</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <div class="block text-sm font-medium text-gray-700">Dátum / idő (alap: most)</div>
-                                    <div class="grid grid-cols-2 gap-2 mt-2">
-                                        <div>
-                                            <label class="block text-xs font-medium text-gray-500" for="natalDate">Dátum</label>
-                                            <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="date" id="natalDate">
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-medium text-gray-500" for="natalTime">Idő</label>
-                                            <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="natalTime" step="60">
-                                        </div>
+                        <!-- Vezérlők: a kért sorrendben -->
+                        <div class="mt-6 max-w-xl mx-auto space-y-4">
+                            <!-- 1) Dátum + idő: egy sorban, közvetlenül az ábra alatt -->
+                            <div>
+                                <div class="block text-sm font-medium text-gray-700">Dátum / idő</div>
+                                <div class="grid grid-cols-2 gap-2 mt-2">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500" for="natalDate">Dátum</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="date" id="natalDate">
                                     </div>
-                                    <div class="mt-2">
-                                        <label class="block text-xs font-medium text-gray-500" for="natalOffset">Időzóna offset (óra, pl. +2)</label>
-                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.25" id="natalOffset" value="2">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500" for="natalTime">Idő</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="natalTime" step="60">
                                     </div>
-                                </div>
-
-                                <div>
-                                    <div class="block text-sm font-medium text-gray-700">Idő léptetése</div>
-                                    <div class="mt-2 flex flex-wrap gap-2">
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-60">-1 perc</button>
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="60">+1 perc</button>
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-3600">-1 óra</button>
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="3600">+1 óra</button>
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="-86400">-1 nap</button>
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" data-step="86400">+1 nap</button>
-                                        <button class="px-3 py-1.5 rounded bg-gray-900 text-white" type="button" id="setNow">Most</button>
-                                    </div>
-                                    <div class="mt-1 text-xs text-gray-500">Perc / óra / nap léptetés, azonnali újraszámolással.</div>
                                 </div>
                             </div>
 
-                            <div class="lg:col-span-7 space-y-4">
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700" for="natalLat">Szélesség (lat)</label>
-                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLat" value="47.4979">
+                            <!-- 2) Idő léptetése: percek / órák / napok -->
+                            <div>
+                                <div class="block text-sm font-medium text-gray-700">Idő léptetése</div>
+
+                                <div class="mt-2 space-y-3">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <div class="text-sm text-gray-700 font-medium">Percek léptetése:</div>
+                                            <div class="mt-1 flex items-center gap-2">
+                                                <input
+                                                    class="block w-24 border-gray-300 rounded-md shadow-sm"
+                                                    type="number"
+                                                    id="shiftMinutes"
+                                                    step="1"
+                                                    min="1"
+                                                    value="1"
+                                                >
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="minutes"
+                                                    data-shift-dir="-1"
+                                                >-</button>
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="minutes"
+                                                    data-shift-dir="1"
+                                                >+</button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div class="text-sm text-gray-700 font-medium">Órák léptetése:</div>
+                                            <div class="mt-1 flex items-center gap-2">
+                                                <input
+                                                    class="block w-24 border-gray-300 rounded-md shadow-sm"
+                                                    type="number"
+                                                    id="shiftHours"
+                                                    step="1"
+                                                    min="1"
+                                                    value="1"
+                                                >
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="hours"
+                                                    data-shift-dir="-1"
+                                                >-</button>
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="hours"
+                                                    data-shift-dir="1"
+                                                >+</button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700" for="natalLon">Hosszúság (lon)</label>
-                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLon" value="19.0402">
+
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <div class="text-sm text-gray-700 font-medium">Napok léptetése:</div>
+                                            <div class="mt-1 flex items-center gap-2">
+                                                <input
+                                                    class="block w-24 border-gray-300 rounded-md shadow-sm"
+                                                    type="number"
+                                                    id="shiftDays"
+                                                    step="1"
+                                                    min="1"
+                                                    value="1"
+                                                >
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="days"
+                                                    data-shift-dir="-1"
+                                                >-</button>
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="days"
+                                                    data-shift-dir="1"
+                                                >+</button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div class="text-sm text-gray-700 font-medium">Hónapok léptetése:</div>
+                                            <div class="mt-1 flex items-center gap-2">
+                                                <input
+                                                    class="block w-24 border-gray-300 rounded-md shadow-sm"
+                                                    type="number"
+                                                    id="shiftMonths"
+                                                    step="1"
+                                                    min="1"
+                                                    value="1"
+                                                >
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="months"
+                                                    data-shift-dir="-1"
+                                                >-</button>
+                                                <button
+                                                    class="px-3 py-1.5 rounded border border-gray-300"
+                                                    type="button"
+                                                    data-shift-unit="months"
+                                                    data-shift-dir="1"
+                                                >+</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700" for="natalQuery">Hely (település / cím)</label>
-                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="text" id="natalQuery" placeholder="pl. Budapest">
-                                    <div class="mt-2 hidden border border-gray-200 rounded-md divide-y" id="natalResults"></div>
-                                </div>
+                                <div class="mt-1 text-xs text-gray-500">Perc / óra / nap léptetés, azonnali újraszámolással.</div>
 
-                                <div class="flex flex-col sm:flex-row gap-2">
-                                    <button class="px-3 py-2 rounded bg-indigo-600 text-white" type="button" id="calcButton">Számítás</button>
+                                <div class="mt-2">
+                                    <button class="px-3 py-1.5 rounded bg-gray-900 text-white" type="button" id="setNow">Most</button>
                                 </div>
-                                <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>
                             </div>
+
+                            <!-- 3) Időzóna -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700" for="natalOffset">Időzóna offset (óra, pl. +2)</label>
+                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.25" id="natalOffset" value="2">
+                            </div>
+
+                            <!-- 4) Hely -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700" for="natalQuery">Hely (település / cím)</label>
+                                <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="text" id="natalQuery" placeholder="pl. Budapest">
+                                <div class="mt-2 hidden border border-gray-200 rounded-md divide-y" id="natalResults"></div>
+                            </div>
+
+                            <!-- 5) Szélesség / hosszúság -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700" for="natalLat">Szélesség (lat)</label>
+                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLat" value="47.4979">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700" for="natalLon">Hosszúság (lon)</label>
+                                    <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="number" step="0.0001" id="natalLon" value="19.0402">
+                                </div>
+                            </div>
+
+                            <!-- 6) Házrendszer, majd 7) Zodiákus -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700" for="houseSystem">Házrendszer</label>
+                                <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="houseSystem">
+                                    <option value="whole_sign">Whole Sign</option>
+                                    <option value="placidus" selected>Placidus</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700" for="zodiacMode">Zodiákus</label>
+                                <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" id="zodiacMode">
+                                    <option value="tropical" selected>Trópusi (0° Kos = tavaszpont)</option>
+                                    <option value="sidereal">Sziderikus (Lahiri)</option>
+                                </select>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <button class="px-3 py-2 rounded bg-indigo-600 text-white" type="button" id="calcButton">Számítás</button>
+                            </div>
+
+                            <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>
                         </div>
                     </div>
 
@@ -170,6 +282,13 @@
             const panelTable = document.getElementById('panelTable');
             const panelAspects = document.getElementById('panelAspects');
             const modeHint = document.getElementById('modeHint');
+            const selectionBox = document.getElementById('selectionBox');
+
+            function showSelection(text) {
+                if (!selectionBox) return;
+                selectionBox.textContent = text;
+                selectionBox.classList.remove('hidden');
+            }
 
             const planetsOrder = [
                 'Sun',
@@ -186,6 +305,23 @@
             ];
 
             const signSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+            const signNamesHu = ['Kos', 'Bika', 'Ikrek', 'Rák', 'Oroszlán', 'Szűz', 'Mérleg', 'Skorpió', 'Nyilas', 'Bak', 'Vízöntő', 'Halak'];
+
+            // Jegy meta (a megadott táblázat alapján)
+            const signMeta = [
+                { name: 'Aries', element: 'fire', quality: 'cardinal', polarity: 'positive' },
+                { name: 'Taurus', element: 'earth', quality: 'fixed', polarity: 'negative' },
+                { name: 'Gemini', element: 'air', quality: 'mutable', polarity: 'positive' },
+                { name: 'Cancer', element: 'water', quality: 'cardinal', polarity: 'negative' },
+                { name: 'Leo', element: 'fire', quality: 'fixed', polarity: 'positive' },
+                { name: 'Virgo', element: 'earth', quality: 'mutable', polarity: 'negative' },
+                { name: 'Libra', element: 'air', quality: 'cardinal', polarity: 'positive' },
+                { name: 'Scorpio', element: 'water', quality: 'fixed', polarity: 'negative' },
+                { name: 'Sagittarius', element: 'fire', quality: 'mutable', polarity: 'positive' },
+                { name: 'Capricorn', element: 'earth', quality: 'cardinal', polarity: 'negative' },
+                { name: 'Aquarius', element: 'air', quality: 'fixed', polarity: 'positive' },
+                { name: 'Pisces', element: 'water', quality: 'mutable', polarity: 'negative' },
+            ];
 
             const aspectDefs = [
                 { name: 'conjunction', angle: 0, color: '#6c757d', mark: '☌' },
@@ -301,6 +437,34 @@
                 calculate();
             }
 
+            function shiftNatalTimeByMonths(deltaMonths) {
+                const err = validateInputs(natalInputs);
+                if (err) {
+                    errorBox.textContent = err;
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const offset = Number(natalInputs.offset.value);
+                const utcMs = localToUtcMs(natalInputs.date.value, natalInputs.time.value, offset);
+
+                // A localMs-t UTC-ként kezeljük, így a dt.getUTC* visszaadja a lokális értékeket.
+                const localMs = utcMs + offset * 60 * 60 * 1000;
+                const dt = new Date(localMs);
+                dt.setUTCMonth(dt.getUTCMonth() + deltaMonths);
+
+                const pad = (v) => String(v).padStart(2, '0');
+                const date = `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+                const time = `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`;
+
+                natalInputs.date.value = date;
+                natalInputs.time.value = time;
+                transitInputs.date.value = date;
+                transitInputs.time.value = time;
+
+                calculate();
+            }
+
             function setDefaultCoords() {
                 // Budapest alapértékek (csak ha üresek a mezők)
                 if (natalInputs.lat.value === '') natalInputs.lat.value = '47.4979';
@@ -409,28 +573,23 @@
                 cx: 200,
                 cy: 200,
 
-                // Külső kerék / fokbeosztás
-                rOuter: 180,
-                rTicksOuter: 180,
-                rTicksMinor: 175,
-                rTicksMid: 172,
-                rTicksMajor: 168,
-
                 // Zodiákus gyűrű
                 rZodiacOuter: 168,
                 rZodiacInner: 140,
 
                 // Ház gyűrű
                 rHouseOuter: 140,
-                rHouseInner: 105,
+                // +20% vastagság (eredetileg 35px volt: 140-105). 35 * 1.2 = 42.
+                rHouseInner: 98,
 
                 // Belső kör és aspektusok
-                rAspect: 95,
-                rInner: 90,
+                // az aspektus zóna 20%-kal keskenyebb: (rHouseInner - rInner) 15px -> 12px
+                rAspect: 92,
+                rInner: 86,
 
                 // Bolygók
-                rPlanetBase: 125,
-                rPlanetStep: 10,
+                rPlanetBase: 123,
+                rPlanetStep: 12,
             };
 
             function normalizeAngle(deg) {
@@ -451,26 +610,33 @@
                 return document.createElementNS('http://www.w3.org/2000/svg', tag);
             }
 
+            function annularSectorPath(startAngleDeg, endAngleDeg, rOuter, rInner) {
+                const a0 = polarToCartesian(startAngleDeg, rOuter);
+                const a1 = polarToCartesian(endAngleDeg, rOuter);
+                const b1 = polarToCartesian(endAngleDeg, rInner);
+                const b0 = polarToCartesian(startAngleDeg, rInner);
+                const large = endAngleDeg - startAngleDeg > 180 ? 1 : 0;
+                return [
+                    `M ${a0.x} ${a0.y}`,
+                    `A ${rOuter} ${rOuter} 0 ${large} 1 ${a1.x} ${a1.y}`,
+                    `L ${b1.x} ${b1.y}`,
+                    `A ${rInner} ${rInner} 0 ${large} 0 ${b0.x} ${b0.y}`,
+                    'Z',
+                ].join(' ');
+            }
+
             function clearChart() {
                 chartSvg.innerHTML = '';
 
                 // alap gyűrűk
-                const outer = svgEl('circle');
-                outer.setAttribute('cx', CHART.cx);
-                outer.setAttribute('cy', CHART.cy);
-                outer.setAttribute('r', CHART.rOuter);
-                outer.setAttribute('fill', '#fff');
-                outer.setAttribute('stroke', '#212529');
-                outer.setAttribute('stroke-width', '2');
-                chartSvg.appendChild(outer);
-
                 const zodiacOuter = svgEl('circle');
                 zodiacOuter.setAttribute('cx', CHART.cx);
                 zodiacOuter.setAttribute('cy', CHART.cy);
                 zodiacOuter.setAttribute('r', CHART.rZodiacOuter);
                 zodiacOuter.setAttribute('fill', 'none');
-                zodiacOuter.setAttribute('stroke', '#343a40');
-                zodiacOuter.setAttribute('stroke-width', '1');
+                // a zodiákus külső köre a legkülső
+                zodiacOuter.setAttribute('stroke', '#212529');
+                zodiacOuter.setAttribute('stroke-width', '2');
                 chartSvg.appendChild(zodiacOuter);
 
                 const zodiacInner = svgEl('circle');
@@ -532,15 +698,35 @@
                 return chartSvg.querySelector(`g[data-layer="${name}"]`);
             }
 
-            function drawDegreeTicks(rotationDeg) {
+            function decanColor(meta, decanIndex) {
+                // decanIndex: 1..3
+                if (decanIndex === 1) {
+                    return meta.polarity === 'negative' ? '#000000' : '#ffffff';
+                }
+                if (decanIndex === 2) {
+                    if (meta.quality === 'fixed') return '#a855f7'; // lila
+                    if (meta.quality === 'cardinal') return '#facc15'; // sárga
+                    return '#7dd3fc'; // világoskék (változó)
+                }
+                // 3. dekád: elem
+                if (meta.element === 'water') return '#2563eb';
+                if (meta.element === 'fire') return '#dc2626';
+                if (meta.element === 'earth') return '#92400e';
+                return '#16a34a'; // air
+            }
+
+            function drawZodiacTicks(rotationDeg) {
                 const layer = getLayer('ticks');
                 if (!layer) return;
                 for (let deg = 0; deg < 360; deg++) {
-                    const angle = normalizeAngle(deg + rotationDeg);
+                    const angle = deg + rotationDeg;
                     const isMajor = deg % 10 === 0;
                     const isMid = !isMajor && deg % 5 === 0;
-                    const r1 = CHART.rTicksOuter;
-                    const r2 = isMajor ? CHART.rTicksMajor : isMid ? CHART.rTicksMid : CHART.rTicksMinor;
+
+                    const len = isMajor ? 10 : isMid ? 7 : 4;
+                    const r1 = CHART.rZodiacOuter;
+                    const r2 = CHART.rZodiacOuter - len;
+
                     const a = polarToCartesian(angle, r1);
                     const b = polarToCartesian(angle, r2);
                     const line = svgEl('line');
@@ -548,9 +734,109 @@
                     line.setAttribute('y1', a.y);
                     line.setAttribute('x2', b.x);
                     line.setAttribute('y2', b.y);
-                    line.setAttribute('stroke', isMajor ? '#212529' : '#adb5bd');
-                    line.setAttribute('stroke-width', isMajor ? '1.6' : isMid ? '1.2' : '0.9');
+                    line.setAttribute('stroke', isMajor ? '#111827' : '#9ca3af');
+                    line.setAttribute('stroke-width', isMajor ? '1.4' : isMid ? '1.1' : '0.8');
                     layer.appendChild(line);
+                }
+            }
+
+            function hexToRgb(hex) {
+                const h = String(hex).replace('#', '').trim();
+                const v = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+                const n = parseInt(v, 16);
+                return {
+                    r: (n >> 16) & 255,
+                    g: (n >> 8) & 255,
+                    b: n & 255,
+                };
+            }
+
+            function rgbToHex({ r, g, b }) {
+                const to2 = (x) => String(Math.max(0, Math.min(255, Math.round(x))).toString(16)).padStart(2, '0');
+                return `#${to2(r)}${to2(g)}${to2(b)}`;
+            }
+
+            function mixHex(a, b, t) {
+                const c1 = hexToRgb(a);
+                const c2 = hexToRgb(b);
+                return rgbToHex({
+                    r: c1.r + (c2.r - c1.r) * t,
+                    g: c1.g + (c2.g - c1.g) * t,
+                    b: c1.b + (c2.b - c1.b) * t,
+                });
+            }
+
+            function drawDecans(rotationDeg) {
+                const layer = getLayer('zodiac');
+                if (!layer) return;
+
+                // Kérés: a dekád színek legyenek halványabbak és átmenetesek (ne éles vágás)
+                // Viszont a jegyhatár (30°) maradjon éles (azt külön vonallal húzzuk).
+                const baseOpacity = 0.55;
+                const transitionWidthDeg = 4; // az átmenet szélessége a dekád-határ körül
+                const slices = 10; // minél több, annál simább az átmenet
+
+                for (let sign = 0; sign < 12; sign++) {
+                    const meta = signMeta[sign];
+                    const c1 = decanColor(meta, 1);
+                    const c2 = decanColor(meta, 2);
+                    const c3 = decanColor(meta, 3);
+
+                    // Alapszegmensek (a dekád-határok körül meghagyunk helyet az átmenetnek)
+                    const halfT = transitionWidthDeg / 2;
+                    const segs = [
+                        { start: 0, end: 10 - halfT, color: c1 },
+                        { start: 10 + halfT, end: 20 - halfT, color: c2 },
+                        { start: 20 + halfT, end: 30, color: c3 },
+                    ];
+
+                    segs.forEach((s) => {
+                        if (s.end <= s.start) return;
+                        const path = svgEl('path');
+                        path.setAttribute(
+                            'd',
+                            annularSectorPath(
+                                sign * 30 + s.start + rotationDeg,
+                                sign * 30 + s.end + rotationDeg,
+                                CHART.rZodiacOuter,
+                                CHART.rZodiacInner
+                            )
+                        );
+                        path.setAttribute('fill', s.color);
+                        path.setAttribute('opacity', String(baseOpacity));
+                        // NINCS stroke: a dekád-határ ne legyen éles
+                        layer.appendChild(path);
+                    });
+
+                    // Átmenet a 10° és 20° határokon belül (jegyhatáron nincs átmenet)
+                    const transitions = [
+                        { boundary: 10, from: c1, to: c2 },
+                        { boundary: 20, from: c2, to: c3 },
+                    ];
+
+                    transitions.forEach(({ boundary, from, to }) => {
+                        const tStart = boundary - halfT;
+                        const step = transitionWidthDeg / slices;
+                        for (let i = 0; i < slices; i++) {
+                            const a0 = tStart + i * step;
+                            const a1 = a0 + step;
+                            const t = (i + 0.5) / slices;
+                            const col = mixHex(from, to, t);
+                            const path = svgEl('path');
+                            path.setAttribute(
+                                'd',
+                                annularSectorPath(
+                                    sign * 30 + a0 + rotationDeg,
+                                    sign * 30 + a1 + rotationDeg,
+                                    CHART.rZodiacOuter,
+                                    CHART.rZodiacInner
+                                )
+                            );
+                            path.setAttribute('fill', col);
+                            path.setAttribute('opacity', String(baseOpacity));
+                            layer.appendChild(path);
+                        }
+                    });
                 }
             }
 
@@ -558,18 +844,38 @@
                 const layer = getLayer('zodiac');
                 if (!layer) return;
 
-                // 30° határok
+                // dekád háttérszínezés a zodiákus gyűrűben
+                drawDecans(rotationDeg);
+
+                // fokbeosztás a zodiákus külső peremén (mint a régi legkülső kör)
+                drawZodiacTicks(rotationDeg);
+
+                // 30° határok (jegyhatár) – vékony sárga „árnyék” kiemeléssel
                 for (let i = 0; i < 12; i++) {
                     const angle = normalizeAngle(i * 30 + rotationDeg);
                     const a = polarToCartesian(angle, CHART.rZodiacInner);
                     const b = polarToCartesian(angle, CHART.rZodiacOuter);
+
+                    // sárga aláhúzás / árnyék (kicsit vastagabb)
+                    const glow = svgEl('line');
+                    glow.setAttribute('x1', a.x);
+                    glow.setAttribute('y1', a.y);
+                    glow.setAttribute('x2', b.x);
+                    glow.setAttribute('y2', b.y);
+                    glow.setAttribute('stroke', '#facc15');
+                    // erősebb sárga árnyék
+                    glow.setAttribute('stroke-width', '2.6');
+                    glow.setAttribute('opacity', '0.85');
+                    layer.appendChild(glow);
+
                     const line = svgEl('line');
                     line.setAttribute('x1', a.x);
                     line.setAttribute('y1', a.y);
                     line.setAttribute('x2', b.x);
                     line.setAttribute('y2', b.y);
-                    line.setAttribute('stroke', '#495057');
-                    line.setAttribute('stroke-width', '1');
+                    // jegyelválasztó vonal: vastagabb + fekete
+                    line.setAttribute('stroke', '#111827');
+                    line.setAttribute('stroke-width', '2');
                     layer.appendChild(line);
 
                     // jegy jel a szektor közepén
@@ -581,10 +887,150 @@
                     label.setAttribute('text-anchor', 'middle');
                     label.setAttribute('dominant-baseline', 'middle');
                     label.setAttribute('font-size', '14');
-                    label.setAttribute('fill', '#0d6efd');
+                    label.setAttribute('fill', '#111827');
                     label.textContent = signSymbols[i];
+                    label.style.cursor = 'pointer';
+                    label.addEventListener('click', () => showSelection(`Jegy: ${signNamesHu[i]}`));
                     layer.appendChild(label);
                 }
+            }
+
+            function drawInnerRingTicks(rotationDeg) {
+                // Legbelső gyűrű: rInner..rAspect zóna
+                const layer = getLayer('ticks');
+                if (!layer) return;
+
+                for (let deg = 0; deg < 360; deg++) {
+                    const angle = deg + rotationDeg;
+                    const isDecan = deg % 10 === 0;
+                    const isMid = !isDecan && deg % 5 === 0;
+
+                    // belső jegyelválasztók (30°) – kék árnyék
+                    const isSignBoundary = deg % 30 === 0;
+
+                    const len = isDecan ? 10 : isMid ? 7 : 4;
+                    const r1 = CHART.rAspect;
+                    const r2 = CHART.rAspect - len;
+
+                    // A 30° jegyelválasztóknál nem rajzolunk külön „rövid tick”-et,
+                    // ott a teljes hosszú (inner->houseInner) vastag fekete vonal jelöl.
+                    if (!isSignBoundary) {
+                        const a = polarToCartesian(angle, r1);
+                        const b = polarToCartesian(angle, r2);
+                        const line = svgEl('line');
+                        line.setAttribute('x1', a.x);
+                        line.setAttribute('y1', a.y);
+                        line.setAttribute('x2', b.x);
+                        line.setAttribute('y2', b.y);
+                        line.setAttribute('stroke', isDecan ? '#111827' : '#9ca3af');
+                        // belső dekádok legyenek vékonyabbak + halványabbak
+                        line.setAttribute('stroke-width', isDecan ? '0.75' : isMid ? '0.65' : '0.45');
+                        line.setAttribute('opacity', '0.65');
+                        layer.appendChild(line);
+                    }
+
+                    if (isSignBoundary) {
+                        // kék glow a 30° határnak (a normál vonal alatt)
+                        // a belső jegyelválasztó most érjen a következő körig (houseInner)
+                        const ga = polarToCartesian(angle, CHART.rHouseInner);
+                        // belülről induljon a 2. körig (inner -> houseInner)
+                        const gb = polarToCartesian(angle, CHART.rInner);
+                        const glow = svgEl('line');
+                        glow.setAttribute('x1', gb.x);
+                        glow.setAttribute('y1', gb.y);
+                        glow.setAttribute('x2', ga.x);
+                        glow.setAttribute('y2', ga.y);
+                        glow.setAttribute('stroke', '#60a5fa');
+                        glow.setAttribute('stroke-width', '2.4');
+                        glow.setAttribute('opacity', '0.7');
+                        // a kék árnyék legyen a normál vonal alatt: ezért utólag beszúrjuk úgy,
+                        // hogy a layer elejére tesszük.
+                        layer.insertBefore(glow, layer.firstChild);
+
+                        // a belső jegyelválasztó vonal legyen vastagabb + fekete
+                        const sa = polarToCartesian(angle, CHART.rHouseInner);
+                        const sb = polarToCartesian(angle, CHART.rInner);
+                        const sline = svgEl('line');
+                        sline.setAttribute('x1', sb.x);
+                        sline.setAttribute('y1', sb.y);
+                        sline.setAttribute('x2', sa.x);
+                        sline.setAttribute('y2', sa.y);
+                        sline.setAttribute('stroke', '#111827');
+                        sline.setAttribute('stroke-width', '2');
+                        sline.setAttribute('opacity', '0.95');
+                        layer.appendChild(sline);
+
+                        // vékony szürke összekötő vonal a külső és belső jegyelválasztók között
+                        // (zodiákus inner -> houseInner)
+                        const ca = polarToCartesian(angle, CHART.rZodiacInner);
+                        const cb = polarToCartesian(angle, CHART.rHouseInner);
+                        const connector = svgEl('line');
+                        connector.setAttribute('x1', cb.x);
+                        connector.setAttribute('y1', cb.y);
+                        connector.setAttribute('x2', ca.x);
+                        connector.setAttribute('y2', ca.y);
+                        connector.setAttribute('stroke', '#9ca3af');
+                        connector.setAttribute('stroke-width', '0.7');
+                        connector.setAttribute('opacity', '0.85');
+                        // a szürke csatlakozó menjen a vastag vonalak alá
+                        layer.insertBefore(connector, layer.firstChild);
+                    }
+                }
+            }
+
+            function drawInnerPlanetMarkers(planets, rotationDeg) {
+                // Bolygó-helyzet jelölő vonalak a legbelső gyűrűben
+                const layer = getLayer('ticks');
+                if (!layer) return;
+
+                planets.forEach((p) => {
+                    const style = getPlanetStyle(p.name);
+                    const angle = p.longitude + rotationDeg;
+                    const a = polarToCartesian(angle, CHART.rInner + 1);
+                    const b = polarToCartesian(angle, CHART.rAspect - 1);
+                    const line = svgEl('line');
+                    line.setAttribute('x1', a.x);
+                    line.setAttribute('y1', a.y);
+                    line.setAttribute('x2', b.x);
+                    line.setAttribute('y2', b.y);
+                    line.setAttribute('stroke', style.fg);
+                    line.setAttribute('stroke-width', '1.4');
+                    line.setAttribute('opacity', '0.95');
+                    layer.appendChild(line);
+                });
+            }
+
+            function drawPlanetMarkers(planets, rotationDeg) {
+                const layer = getLayer('ticks');
+                if (!layer) return;
+                planets.forEach((p) => {
+                    const style = getPlanetStyle(p.name);
+                    const angle = p.longitude + rotationDeg;
+                    const a = polarToCartesian(angle, CHART.rZodiacInner + 1);
+                    const b = polarToCartesian(angle, CHART.rZodiacOuter - 1);
+                    const line = svgEl('line');
+                    line.setAttribute('x1', a.x);
+                    line.setAttribute('y1', a.y);
+                    line.setAttribute('x2', b.x);
+                    line.setAttribute('y2', b.y);
+                    line.setAttribute('stroke', style.fg);
+                    line.setAttribute('stroke-width', '1.1');
+                    line.setAttribute('opacity', '0.9');
+                    layer.appendChild(line);
+
+                    // plusz jelölés a zodiákus külső fokbeosztásán (kis tick)
+                    const t1 = polarToCartesian(angle, CHART.rZodiacOuter);
+                    const t2 = polarToCartesian(angle, CHART.rZodiacOuter - 12);
+                    const tick = svgEl('line');
+                    tick.setAttribute('x1', t1.x);
+                    tick.setAttribute('y1', t1.y);
+                    tick.setAttribute('x2', t2.x);
+                    tick.setAttribute('y2', t2.y);
+                    tick.setAttribute('stroke', style.fg);
+                    tick.setAttribute('stroke-width', '1.4');
+                    tick.setAttribute('opacity', '0.95');
+                    layer.appendChild(tick);
+                });
             }
 
             function drawHousesFromCusps(cusps, rotationDeg) {
@@ -645,16 +1091,6 @@
                 if (!layer) return;
                 const mx = (a.x + b.x) / 2;
                 const my = (a.y + b.y) / 2;
-
-                const bg = svgEl('circle');
-                bg.setAttribute('cx', mx);
-                bg.setAttribute('cy', my);
-                bg.setAttribute('r', '10');
-                bg.setAttribute('fill', '#fff');
-                bg.setAttribute('opacity', '0.9');
-                bg.setAttribute('stroke', def.color);
-                bg.setAttribute('stroke-width', '1');
-                layer.appendChild(bg);
 
                 const text = svgEl('text');
                 text.setAttribute('x', mx);
@@ -749,22 +1185,22 @@
 
                 switch (name) {
                     case 'Sun':
-                        // Nap 100%-kal nagyobb
-                        return { ...base, fg: '#f59e0b', bg: '#fff', r: 18, fontSize: 28 };
+                        // Nap: sárga alapon fehér
+                        return { ...base, fg: '#ffffff', bg: '#facc15', r: 18, fontSize: 28, ringStroke: '#111827' };
                     case 'Moon':
-                        return { ...base, fg: '#fff', bg: '#111827', r: 16, fontSize: 22 };
+                        return { ...base, fg: '#111827', bg: '#ffffff', r: 16, fontSize: 22 };
                     case 'Mars':
                         return { ...base, fg: '#dc2626' };
                     case 'Venus':
                         return { ...base, fg: '#2563eb' };
                     case 'Jupiter':
-                        return { ...base, fg: '#111' };
+                        return { ...base, fg: '#7f1d1d' }; // bordó
                     case 'Saturn':
-                        return { ...base, fg: '#fff', bg: '#111827' };
+                        return { ...base, fg: '#7c3aed' }; // lila
                     case 'Mercury':
                         return { ...base, fg: '#16a34a' };
                     default:
-                        return base;
+                        return { ...base, fg: '#111827' };
                 }
             }
 
@@ -797,6 +1233,10 @@
                 g.appendChild(t);
 
                 layer.appendChild(g);
+
+                // kattintás: bolygó neve
+                g.style.cursor = 'pointer';
+                g.addEventListener('click', () => showSelection(`Bolygó: ${name}`));
             }
 
             function drawPlanets(planets, rotationDeg) {
@@ -904,8 +1344,13 @@
                     const rotationDeg = normalizeAngle(270 - data.natal.asc);
 
                     clearChart();
-                    drawDegreeTicks(rotationDeg);
                     drawZodiacRing(rotationDeg);
+                    // bolygó jelölő vonalak a zodiákus gyűrűben
+                    drawPlanetMarkers(data.natal.planets, rotationDeg);
+
+                    // Legbelső gyűrű: fok+dekád beosztás + bolygó jelölő vonalak
+                    drawInnerRingTicks(rotationDeg);
+                    drawInnerPlanetMarkers(data.natal.planets, rotationDeg);
 
                     // Házak: a natal cuspok adják az alapot
                     drawHousesFromCusps(data.natal.houses, rotationDeg);
@@ -944,7 +1389,6 @@
             // Kezdő állapot: klasszikus kerék alap (ASC-rotáció nélkül), hogy ne legyen üres az ábra.
             // A "Számítás" után a teljes kerék ASC szerint elforgatva jelenik meg.
             clearChart();
-            drawDegreeTicks(0);
             drawZodiacRing(0);
 
             zodiacModeSelect.addEventListener('change', () => {
@@ -972,15 +1416,42 @@
             });
 
             // léptető gombok
-            document.querySelectorAll('[data-step]').forEach((btn) => {
+            const shiftValueInputs = {
+                minutes: document.getElementById('shiftMinutes'),
+                hours: document.getElementById('shiftHours'),
+                days: document.getElementById('shiftDays'),
+                months: document.getElementById('shiftMonths'),
+            };
+
+            function readPositiveInt(inputEl, fallback = 1) {
+                if (!inputEl) return fallback;
+                const v = parseInt(String(inputEl.value), 10);
+                return Number.isFinite(v) && v > 0 ? v : fallback;
+            }
+
+            const unitSeconds = {
+                minutes: 60,
+                hours: 3600,
+                days: 86400,
+            };
+
+            document.querySelectorAll('[data-shift-unit]').forEach((btn) => {
                 btn.addEventListener('click', () => {
-                    const delta = Number(btn.getAttribute('data-step'));
-                    if (!Number.isFinite(delta)) return;
-                    shiftNatalTimeBySeconds(delta);
+                    const unit = btn.getAttribute('data-shift-unit');
+                    const dir = Number(btn.getAttribute('data-shift-dir'));
+                    if (!unit || !Number.isFinite(dir) || (dir !== 1 && dir !== -1)) return;
+                    const amount = readPositiveInt(shiftValueInputs[unit], 1);
+
+                    if (unit === 'months') {
+                        shiftNatalTimeByMonths(dir * amount);
+                        return;
+                    }
+                    if (!(unit in unitSeconds)) return;
+                    shiftNatalTimeBySeconds(dir * amount * unitSeconds[unit]);
                 });
             });
 
-            document.getElementById('setNow').addEventListener('click', () => {
+            document.getElementById('setNow')?.addEventListener('click', () => {
                 setDefaultTimes();
                 calculate();
             });
