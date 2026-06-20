@@ -720,134 +720,81 @@
                 });
             }
 
-            // Egyszerű, vonalas planet-glyph-ek (SVG path). Nem tipográfiai jel, hanem rajzolt forma.
-            // Lokális koordináta: kb. -12..+12, ezt skálázzuk.
-            const planetGlyphPaths = {
-                Sun: [
-                    'M 0 -7 A 7 7 0 1 0 0 7 A 7 7 0 1 0 0 -7',
-                    'M 0 -2 A 2 2 0 1 0 0 2 A 2 2 0 1 0 0 -2',
-                ],
-                Moon: ['M 4 -8 A 8 8 0 1 0 4 8 A 6 6 0 1 1 4 -8'],
-                Mercury: [
-                    'M 0 -11 C -4 -15 4 -15 0 -11',
-                    'M 0 -5 A 5 5 0 1 0 0 5 A 5 5 0 1 0 0 -5',
-                    'M 0 5 L 0 12',
-                    'M -4 9 L 4 9',
-                ],
-                Venus: [
-                    'M 0 -6 A 6 6 0 1 0 0 6 A 6 6 0 1 0 0 -6',
-                    'M 0 6 L 0 13',
-                    'M -4 10 L 4 10',
-                ],
-                Mars: [
-                    'M 0 -6 A 6 6 0 1 0 0 6 A 6 6 0 1 0 0 -6',
-                    'M 3 -3 L 12 -12',
-                    'M 12 -12 L 12 -5',
-                    'M 12 -12 L 5 -12',
-                ],
-                Jupiter: [
-                    'M -2 -12 L -2 12',
-                    'M -2 -2 C -2 -9 8 -9 8 -2 C 8 5 -2 5 -2 12',
-                    'M -8 2 L 6 2',
-                ],
-                Saturn: [
-                    'M -5 -12 L -5 12',
-                    'M -5 -4 C -5 -9 6 -9 6 -4 C 6 1 -5 1 -5 6',
-                    'M -10 4 L 10 4',
-                ],
-                Uranus: [
-                    'M -8 -12 L -8 4',
-                    'M 8 -12 L 8 4',
-                    'M -8 -2 L 8 -2',
-                    'M 0 4 A 3 3 0 1 0 0 10 A 3 3 0 1 0 0 4',
-                    'M 0 10 L 0 14',
-                    'M -4 14 L 4 14',
-                ],
-                Neptune: [
-                    'M 0 -13 L 0 13',
-                    'M 0 -13 C -10 -5 -10 3 0 3',
-                    'M 0 -13 C 10 -5 10 3 0 3',
-                    'M -8 13 L 8 13',
-                ],
-                Pluto: [
-                    'M 0 -12 A 4 4 0 1 0 0 -4 A 4 4 0 1 0 0 -12',
-                    'M 0 -8 L 0 14',
-                    'M -6 6 L 6 6',
-                    'M -8 -2 C -8 -10 8 -10 8 -2',
-                ],
-                'True Node': [
-                    'M -8 -4 A 8 8 0 0 1 8 -4',
-                    'M -8 4 A 8 8 0 0 0 8 4',
-                    'M 0 -4 L 0 4',
-                ],
+            // Standard bolygó jelek (unicode). A kérésed szerint ezeket használjuk.
+            // Font: Windows alatt a Segoe UI Symbol általában tartalmazza ezeket.
+            const planetSymbols = {
+                Sun: '☉',
+                Moon: '☾',
+                Mercury: '☿',
+                Venus: '♀',
+                Mars: '♂',
+                Jupiter: '♃',
+                Saturn: '♄',
+                Uranus: '♅',
+                Neptune: '♆',
+                Pluto: '♇',
+                'True Node': '☊',
             };
 
             function getPlanetStyle(name) {
-                // Alap
-                const style = {
-                    // bolygók +50%
-                    size: 21,
-                    stroke: '#111',
-                    haloFill: '#fff',
-                    haloOpacity: 0.92,
-                    haloR: 14,
-                    strokeWidth: 2,
+                const base = {
+                    symbol: planetSymbols[name] ?? '?',
+                    fg: '#111',
+                    bg: '#fff',
+                    r: 14,
+                    fontSize: 18,
+                    ringStroke: '#111',
+                    ringStrokeWidth: 1,
                 };
 
                 switch (name) {
                     case 'Sun':
-                        // Nap +100% az alaphoz képest
-                        // A Nap körvonala ne legyen nagyobb a jelénél
-                        return { ...style, size: 42, stroke: '#f59e0b', haloFill: '#fff', haloOpacity: 0.95, haloR: 11 };
+                        // Nap 100%-kal nagyobb
+                        return { ...base, fg: '#f59e0b', bg: '#fff', r: 18, fontSize: 28 };
                     case 'Moon':
-                        return { ...style, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95 };
+                        return { ...base, fg: '#fff', bg: '#111827', r: 16, fontSize: 22 };
                     case 'Mars':
-                        return { ...style, stroke: '#dc2626' };
+                        return { ...base, fg: '#dc2626' };
                     case 'Venus':
-                        return { ...style, stroke: '#2563eb' };
+                        return { ...base, fg: '#2563eb' };
                     case 'Jupiter':
-                        return { ...style, stroke: '#111' };
+                        return { ...base, fg: '#111' };
                     case 'Saturn':
-                        return { ...style, stroke: '#fff', haloFill: '#111827', haloOpacity: 0.95 };
+                        return { ...base, fg: '#fff', bg: '#111827' };
                     case 'Mercury':
-                        return { ...style, stroke: '#16a34a' };
+                        return { ...base, fg: '#16a34a' };
                     default:
-                        return style;
+                        return base;
                 }
             }
 
             function drawPlanetGlyph(name, x, y, style) {
                 const layer = getLayer('planets');
                 if (!layer) return;
-                const paths = planetGlyphPaths[name];
-                if (!paths) return;
 
                 const g = svgEl('g');
-                const scale = style.size / 28;
-                g.setAttribute('transform', `translate(${x} ${y}) scale(${scale})`);
+                g.setAttribute('transform', `translate(${x} ${y})`);
 
-                // háttér “halo”, hogy olvasható legyen a vonal a keréken
-                const halo = svgEl('circle');
-                halo.setAttribute('cx', '0');
-                halo.setAttribute('cy', '0');
-                halo.setAttribute('r', String(style.haloR));
-                halo.setAttribute('fill', style.haloFill);
-                halo.setAttribute('opacity', String(style.haloOpacity));
-                // vékony fekete kör a bolygó körül
-                halo.setAttribute('stroke', '#111');
-                halo.setAttribute('stroke-width', '1');
-                g.appendChild(halo);
+                // kör alakú ikon (vékony fekete kör)
+                const ring = svgEl('circle');
+                ring.setAttribute('cx', '0');
+                ring.setAttribute('cy', '0');
+                ring.setAttribute('r', String(style.r));
+                ring.setAttribute('fill', style.bg);
+                ring.setAttribute('stroke', style.ringStroke);
+                ring.setAttribute('stroke-width', String(style.ringStrokeWidth));
+                g.appendChild(ring);
 
-                paths.forEach((d) => {
-                    const p = svgEl('path');
-                    p.setAttribute('d', d);
-                    p.setAttribute('fill', 'none');
-                    p.setAttribute('stroke', style.stroke);
-                    p.setAttribute('stroke-width', String(style.strokeWidth));
-                    p.setAttribute('stroke-linecap', 'round');
-                    p.setAttribute('stroke-linejoin', 'round');
-                    g.appendChild(p);
-                });
+                const t = svgEl('text');
+                t.setAttribute('x', '0');
+                t.setAttribute('y', '0');
+                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('dominant-baseline', 'middle');
+                t.setAttribute('font-size', String(style.fontSize));
+                t.setAttribute('font-family', '"Segoe UI Symbol", "Noto Sans Symbols2", "DejaVu Sans", sans-serif');
+                t.setAttribute('fill', style.fg);
+                t.textContent = style.symbol;
+                g.appendChild(t);
 
                 layer.appendChild(g);
             }
@@ -881,7 +828,7 @@
                     dot.setAttribute('cx', point.x);
                     dot.setAttribute('cy', point.y);
                     dot.setAttribute('r', '2.5');
-                    dot.setAttribute('fill', style.stroke);
+                    dot.setAttribute('fill', style.fg);
                     layer.appendChild(dot);
 
                     drawPlanetGlyph(planet.name, point.x, point.y, style);
