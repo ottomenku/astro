@@ -195,7 +195,7 @@ sudo systemctl reload apache2
 
 ```bash
 sudo apt install -y certbot python3-certbot-apache
-sudo certbot --apache -d domain.tld
+sudo certbot --apache -d mitakarunk.hu
 ```
 
 ## 12) Smoke teszt

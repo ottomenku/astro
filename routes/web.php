@@ -5,9 +5,14 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\HoroscopeController;
 use App\Http\Controllers\Admin\AdminConversationController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\AdminVisitorController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
     return view('welcome');
 });
 
@@ -30,6 +35,10 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/visitors', [AdminVisitorController::class, 'index'])->name('visitors.index');
+    Route::patch('/visitors/{visitor}/ban', [AdminVisitorController::class, 'ban'])->name('visitors.ban');
+    Route::patch('/visitors/{visitor}/unban', [AdminVisitorController::class, 'unban'])->name('visitors.unban');
+
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [AdminUserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');

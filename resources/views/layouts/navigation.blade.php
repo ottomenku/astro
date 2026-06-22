@@ -22,7 +22,7 @@
                         Chat
                     </x-nav-link>
                     @if (Auth::user()?->is_admin)
-                        <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">
+                        <x-nav-link :href="route('admin.visitors.index')" :active="request()->routeIs('admin.*')">
                             Admin
                         </x-nav-link>
                     @endif
@@ -88,7 +88,7 @@
                 Chat
             </x-responsive-nav-link>
             @if (Auth::user()?->is_admin)
-                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">
+                <x-responsive-nav-link :href="route('admin.visitors.index')" :active="request()->routeIs('admin.*')">
                     Admin
                 </x-responsive-nav-link>
             @endif
