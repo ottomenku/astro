@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -22,6 +23,20 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+
+        // születési adatok
+        'birth_datetime_utc',
+        'birth_tz_offset',
+        'birth_place_label',
+        'birth_lat',
+        'birth_lon',
+
+        // jelenlegi hely (tranzitokhoz)
+        'current_tz_offset',
+        'current_place_label',
+        'current_lat',
+        'current_lon',
+
         'tier',
         'is_admin',
         'token_quota_total',
@@ -51,6 +66,18 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'token_quota_reset_at' => 'datetime',
+
+            'birth_datetime_utc' => 'datetime',
         ];
+    }
+
+    public function horoscopes(): HasMany
+    {
+        return $this->hasMany(UserHoroscope::class);
+    }
+
+    public function chatThreads(): HasMany
+    {
+        return $this->hasMany(ChatThread::class);
     }
 }

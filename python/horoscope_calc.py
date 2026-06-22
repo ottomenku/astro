@@ -107,6 +107,44 @@ def calc_planets(jd: float, ayanamsa: float) -> list[dict]:
     return results
 
 
+ASPECT_DEFS = [
+    {"type": "conjunction", "angle": 0, "orb": 8.0},
+    {"type": "sextile", "angle": 60, "orb": 6.0},
+    {"type": "square", "angle": 90, "orb": 6.0},
+    {"type": "trine", "angle": 120, "orb": 6.0},
+    {"type": "opposition", "angle": 180, "orb": 8.0},
+]
+
+
+def angle_delta(a: float, b: float) -> float:
+    d = abs(normalize_degree(a) - normalize_degree(b))
+    return min(d, 360.0 - d)
+
+
+def calc_aspects(planets: list[dict]) -> list[dict]:
+    # egyszerű aspektus lista bolygó párokra
+    aspects: list[dict] = []
+    for i in range(len(planets)):
+        for j in range(i + 1, len(planets)):
+            p1 = planets[i]
+            p2 = planets[j]
+            d = angle_delta(p1["longitude"], p2["longitude"])
+            for ad in ASPECT_DEFS:
+                orb = abs(d - ad["angle"])
+                if orb <= ad["orb"]:
+                    aspects.append(
+                        {
+                            "p1": p1["name"],
+                            "p2": p2["name"],
+                            "type": ad["type"],
+                            "angle": ad["angle"],
+                            "orb": round(orb, 3),
+                        }
+                    )
+                    break
+    return aspects
+
+
 def format_house(asc: float, longitude: float) -> int:
     diff = normalize_degree(longitude - asc)
     return int(diff // 30) + 1
@@ -121,6 +159,7 @@ def build_chart(entry: dict, sidereal: bool, house_system: str) -> dict:
     asc_mc = calc_asc_mc(jd, lat, lon, ayanamsa)
     houses = calc_house_cusps(jd, lat, lon, ayanamsa, house_system)
     planets = calc_planets(jd, ayanamsa)
+    aspects = calc_aspects(planets)
     for planet in planets:
         # ház számítása: whole_sign esetén ASC alapján, placidusnál cuspok alapján
         if house_system == "placidus":
@@ -151,6 +190,7 @@ def build_chart(entry: dict, sidereal: bool, house_system: str) -> dict:
         "mc": asc_mc["mc"],
         "houses": houses,
         "planets": planets,
+        "aspects": aspects,
     }
 
 

@@ -23,6 +23,8 @@
                             <div id="selectionBox" class="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2 hidden"></div>
                         </div>
 
+                        <!-- A hely automatikusan töltődik a Most / Születési idő gombok alapján -->
+
                         <!-- Vezérlők: a kért sorrendben -->
                         <div class="mt-6 max-w-xl mx-auto space-y-4">
                             <!-- 1) Dátum + idő: egy sorban, közvetlenül az ábra alatt -->
@@ -156,8 +158,9 @@
 
                                 <div class="mt-1 text-xs text-gray-500">Perc / óra / nap léptetés, azonnali újraszámolással.</div>
 
-                                <div class="mt-2">
+                                <div class="mt-2 flex items-center gap-2">
                                     <button class="px-3 py-1.5 rounded bg-gray-900 text-white" type="button" id="setNow">Most</button>
+                                    <button class="px-3 py-1.5 rounded border border-gray-300" type="button" id="setBirth">Születési idő</button>
                                 </div>
                             </div>
 
@@ -203,9 +206,7 @@
                                 </select>
                             </div>
 
-                            <div class="flex flex-col sm:flex-row gap-2">
-                                <button class="px-3 py-2 rounded bg-indigo-600 text-white" type="button" id="calcButton">Számítás</button>
-                            </div>
+                            <!-- Számítás gomb nem kell: automatikus számítás (Most/Születési idő/léptetés/módosítás) -->
 
                             <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>
                         </div>
@@ -251,6 +252,59 @@
                 offset: document.getElementById('natalOffset'),
             };
 
+            const setBirthBtn = document.getElementById('setBirth');
+
+            // User születési/jelenlegi hely adatok (Laravel Auth user-ből)
+            const USER_LOC = {
+                birth: {
+                    label: @json(auth()->user()->birth_place_label),
+                    lat: @json(auth()->user()->birth_lat),
+                    lon: @json(auth()->user()->birth_lon),
+                    offset: @json(auth()->user()->birth_tz_offset),
+                },
+                current: {
+                    label: @json(auth()->user()->current_place_label),
+                    lat: @json(auth()->user()->current_lat),
+                    lon: @json(auth()->user()->current_lon),
+                    offset: @json(auth()->user()->current_tz_offset),
+                },
+            };
+
+            // Születési dátum/idő (UTC + offset) -> lokális input mezők
+            const USER_BIRTH = {
+                datetime_utc: @json(optional(auth()->user()->birth_datetime_utc)->toISOString()),
+                offset: @json(auth()->user()->birth_tz_offset),
+            };
+
+            function applyLocation(mode) {
+                const src = USER_LOC[mode] || USER_LOC.current;
+                if (src.label) natalInputs.query.value = src.label;
+                if (src.lat !== null && src.lat !== undefined) natalInputs.lat.value = Number(src.lat).toFixed(4);
+                if (src.lon !== null && src.lon !== undefined) natalInputs.lon.value = Number(src.lon).toFixed(4);
+                if (src.offset !== null && src.offset !== undefined && src.offset !== '') natalInputs.offset.value = src.offset;
+
+                // tranzit defaultban kövesse a natalt
+                transitInputs.query.value = natalInputs.query.value;
+                transitInputs.lat.value = natalInputs.lat.value;
+                transitInputs.lon.value = natalInputs.lon.value;
+                transitInputs.offset.value = natalInputs.offset.value;
+            }
+
+            function setBirthTimeFromUser() {
+                if (!USER_BIRTH.datetime_utc) return;
+                const offset = Number(USER_BIRTH.offset ?? natalInputs.offset.value ?? 0);
+                natalInputs.offset.value = String(offset);
+
+                const utcMs = Date.parse(USER_BIRTH.datetime_utc);
+                const local = utcMsToLocalInputs(utcMs, offset);
+                natalInputs.date.value = local.date;
+                natalInputs.time.value = local.time;
+
+                // tranzit defaultban kövesse a natalt
+                transitInputs.date.value = natalInputs.date.value;
+                transitInputs.time.value = natalInputs.time.value;
+            }
+
             // Transit UI (később): jelenleg a tranzit automatikusan a natal adatokkal azonos.
             const transitInputs = {
                 date: natalInputs.date,
@@ -263,6 +317,7 @@
             };
 
             const errorBox = document.getElementById('errorBox');
+            // nincs számítás gomb, marad a kód a "busy" jelzéshez (null-ellenőrzéssel)
             const calcButton = document.getElementById('calcButton');
             // régi "Natal → tranzit" gomb már nincs a tabos UI-ban
             const copyButton = null;
@@ -1285,8 +1340,10 @@
                     return;
                 }
 
-                calcButton.disabled = true;
-                calcButton.textContent = 'Számítás...';
+                if (calcButton) {
+                    calcButton.disabled = true;
+                    calcButton.textContent = 'Számítás...';
+                }
 
                 try {
                     const payload = {
@@ -1369,21 +1426,24 @@
                     errorBox.textContent = `${msg}${python}${details}`;
                     errorBox.classList.remove('hidden');
                 } finally {
-                    calcButton.disabled = false;
-                    calcButton.textContent = 'Számítás';
+                    if (calcButton) {
+                        calcButton.disabled = false;
+                        calcButton.textContent = 'Számítás';
+                    }
                 }
             }
 
             // nincs külön transit UI, a tranzit a natalt követi
 
-            calcButton.addEventListener('click', calculate);
+            // nincs számítás gomb
             attachGeocode(natalInputs);
             // nincs külön transit UI
             setDefaultTimes();
             setDefaultCoords();
             updateModeHint();
 
-            // Betöltéskor azonnali számítás az aktuális időpontra
+            // Betöltéskor: alapból Mostani hely + Most idő
+            applyLocation('current');
             calculate();
 
             // Kezdő állapot: klasszikus kerék alap (ASC-rotáció nélkül), hogy ne legyen üres az ábra.
@@ -1453,6 +1513,13 @@
 
             document.getElementById('setNow')?.addEventListener('click', () => {
                 setDefaultTimes();
+                applyLocation('current');
+                calculate();
+            });
+
+            setBirthBtn?.addEventListener('click', () => {
+                setBirthTimeFromUser();
+                applyLocation('birth');
                 calculate();
             });
 

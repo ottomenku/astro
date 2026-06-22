@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ChatThreadController;
 use App\Http\Controllers\HoroscopeController;
+use App\Http\Controllers\HoroscopeToolsController;
 use App\Http\Controllers\Admin\AdminConversationController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminVisitorController;
@@ -29,9 +31,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/chat/models', [ChatController::class, 'models'])->name('chat.models');
     Route::post('/chat/send', [ChatController::class, 'send'])->name('chat.send');
 
+    Route::get('/chat/threads', [ChatThreadController::class, 'index'])->name('chat.threads.index');
+    Route::post('/chat/threads', [ChatThreadController::class, 'store'])->name('chat.threads.store');
+    Route::get('/chat/threads/{thread}', [ChatThreadController::class, 'show'])->name('chat.threads.show');
+
     Route::get('/horoscope', [HoroscopeController::class, 'index'])->name('horoscope.index');
     Route::get('/api/geocode', [HoroscopeController::class, 'geocode'])->name('horoscope.geocode');
     Route::post('/api/horoscope/calc', [HoroscopeController::class, 'calculate'])->name('horoscope.calculate');
+
+    Route::post('/api/tools/transit/now', [HoroscopeToolsController::class, 'transitNow'])->name('tools.transit.now');
+    Route::post('/api/tools/transit/find', [HoroscopeToolsController::class, 'findEvent'])->name('tools.transit.find');
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {

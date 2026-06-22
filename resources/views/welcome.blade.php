@@ -29,13 +29,19 @@
      style="background-image: url('{{ asset('images/astro-motto-hero.png') }}');">
 
     <div class="relative z-10 w-full text-center">
-        <h1 class="text-6xl md:text-7xl font-bold mb-2 tracking-wide">
+        <h1 class="text-7xl md:text-8xl font-bold mb-3 tracking-wide text-center">
             Astro MOtto
         </h1>
 
-        <p class="text-slate-300 mb-8">
+        <p class="text-slate-200 mb-4 text-lg text-center">
             Bejelentkezés
         </p>
+
+        <div class="mb-6 text-center">
+            <a href="{{ route('register') }}" class="underline text-sm text-slate-200 hover:text-white">
+                Még nincs fiókod? Regisztráció
+            </a>
+        </div>
 
         <div class="login-form-card bg-black/70 backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-8 shadow-2xl">
             @if (session('status'))

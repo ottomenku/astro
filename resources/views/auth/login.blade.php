@@ -1,4 +1,11 @@
 <x-guest-layout>
+    <div class="mb-4 text-center">
+        <h1 class="text-2xl font-semibold text-gray-900">Bejelentkezés</h1>
+        <a href="{{ route('register') }}" class="text-sm underline text-gray-600 hover:text-gray-900">
+            Regisztráció
+        </a>
+    </div>
+
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 

@@ -21,16 +21,18 @@ class OpenAIClient
     /**
      * Minimal OpenAI Chat Completions call.
      *
-     * @param  array<int, array{role:string, content:string}>  $messages
+     * @param  array<int, array<string, mixed>>  $messages
      */
-    public function chat(array $messages, ?string $model = null): Response
+    public function chat(array $messages, ?string $model = null, array $options = []): Response
     {
         $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
         $model = $model ?: (string) config('services.openai.model', 'gpt-4o-mini');
 
-        return $this->http()->post($baseUrl.'/chat/completions', [
+        $payload = array_merge([
             'model' => $model,
             'messages' => $messages,
-        ]);
+        ], $options);
+
+        return $this->http()->post($baseUrl.'/chat/completions', $payload);
     }
 }
