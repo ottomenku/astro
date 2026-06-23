@@ -12,14 +12,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect()->route('dashboard');
+        return redirect()->route('horoscope.index');
     }
 
     return view('welcome');
 });
 
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    return redirect()->route('horoscope.index');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/horoscope', [HoroscopeController::class, 'index'])->name('horoscope.index');
     Route::get('/api/geocode', [HoroscopeController::class, 'geocode'])->name('horoscope.geocode');
     Route::post('/api/horoscope/calc', [HoroscopeController::class, 'calculate'])->name('horoscope.calculate');
+    Route::post('/api/horoscope/chat', [HoroscopeController::class, 'chat'])->name('horoscope.chat');
 
     Route::post('/api/tools/transit/now', [HoroscopeToolsController::class, 'transitNow'])->name('tools.transit.now');
     Route::post('/api/tools/transit/find', [HoroscopeToolsController::class, 'findEvent'])->name('tools.transit.find');

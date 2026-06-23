@@ -23,6 +23,38 @@
                             <div id="selectionBox" class="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2 hidden"></div>
                         </div>
 
+                        <div class="mt-4 max-w-xl mx-auto space-y-2" id="horoscopeChat">
+                            <div class="flex justify-end">
+                                <button
+                                    type="button"
+                                    id="horoscopeChatSend"
+                                    class="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Küldés
+                                </button>
+                            </div>
+
+                            <label class="sr-only" for="horoscopeChatQuestion">Kérdés</label>
+                            <textarea
+                                id="horoscopeChatQuestion"
+                                rows="1"
+                                class="horoscope-chat-field block w-full border-gray-300 rounded-md shadow-sm text-sm"
+                                placeholder="Kérdés..."
+                                autocomplete="off"
+                            ></textarea>
+
+                            <label class="sr-only" for="horoscopeChatAnswer">Válasz</label>
+                            <textarea
+                                id="horoscopeChatAnswer"
+                                rows="1"
+                                readonly
+                                class="horoscope-chat-field horoscope-chat-answer block w-full border-gray-300 rounded-md shadow-sm text-sm bg-gray-50"
+                                placeholder=""
+                            ></textarea>
+
+                            <div class="hidden text-sm text-red-600" id="horoscopeChatError"></div>
+                        </div>
+
                         <!-- A hely automatikusan töltődik a Most / Születési idő gombok alapján -->
 
                         <!-- Vezérlők: a kért sorrendben -->
@@ -235,12 +267,24 @@
         </div>
     </div>
 
+    <style>
+        .horoscope-chat-field {
+            min-height: 2.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+            resize: none;
+            field-sizing: content;
+        }
+    </style>
+
     <script>
             // Relatív URL-ek: így mindegy, hogy localhost vagy 127.0.0.1 alatt nyitod meg az oldalt,
             // a fetch mindig ugyanarra az originre megy (nem lesz CORS / "Failed to fetch").
             const geocodeUrl = '{{ route('horoscope.geocode', [], false) }}';
             const calcUrl = '{{ route('horoscope.calculate', [], false) }}';
+            const horoscopeChatUrl = '{{ route('horoscope.chat', [], false) }}';
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            let lastHoroscopeData = null;
 
             const natalInputs = {
                 date: document.getElementById('natalDate'),
@@ -1418,6 +1462,8 @@
                         drawAspects(data.natal.planets, CHART.rAspect, 0.55, rotationDeg);
                         drawPlanets(data.natal.planets, rotationDeg);
                     }
+
+                    lastHoroscopeData = data;
                 } catch (error) {
                     console.error('Horoscope calculate failed:', error);
                     const msg = error?.message || 'Ismeretlen hiba';
@@ -1528,5 +1574,118 @@
             tabTable.addEventListener('click', () => setActiveTab('table'));
             tabAspects.addEventListener('click', () => setActiveTab('aspects'));
             setActiveTab('chart');
+
+            // Egyszerűsített chat az ábra alatt
+            const horoscopeChatQuestion = document.getElementById('horoscopeChatQuestion');
+            const horoscopeChatAnswer = document.getElementById('horoscopeChatAnswer');
+            const horoscopeChatSend = document.getElementById('horoscopeChatSend');
+            const horoscopeChatError = document.getElementById('horoscopeChatError');
+            let horoscopeChatBusy = false;
+
+            function adjustHoroscopeChatFieldHeight(field) {
+                if (!field) return;
+                field.style.height = 'auto';
+                const nextHeight = Math.min(field.scrollHeight, 400);
+                field.style.height = `${Math.max(nextHeight, 40)}px`;
+            }
+
+            function adjustHoroscopeChatAnswerHeight() {
+                adjustHoroscopeChatFieldHeight(horoscopeChatAnswer);
+            }
+
+            function adjustHoroscopeChatQuestionHeight() {
+                adjustHoroscopeChatFieldHeight(horoscopeChatQuestion);
+            }
+
+            function setHoroscopeChatError(message) {
+                if (!horoscopeChatError) return;
+                if (!message) {
+                    horoscopeChatError.textContent = '';
+                    horoscopeChatError.classList.add('hidden');
+                    return;
+                }
+                horoscopeChatError.textContent = message;
+                horoscopeChatError.classList.remove('hidden');
+            }
+
+            async function sendHoroscopeChatQuestion() {
+                if (!horoscopeChatQuestion || !horoscopeChatAnswer || horoscopeChatBusy) return;
+
+                const prompt = horoscopeChatQuestion.value.trim();
+                if (!prompt) return;
+
+                horoscopeChatBusy = true;
+                horoscopeChatQuestion.disabled = true;
+                if (horoscopeChatSend) horoscopeChatSend.disabled = true;
+                setHoroscopeChatError('');
+                horoscopeChatAnswer.value = 'Válasz...';
+                adjustHoroscopeChatAnswerHeight();
+
+                try {
+                    const payload = {
+                        prompt,
+                        chart: lastHoroscopeData,
+                    };
+
+                    const response = await fetch(horoscopeChatUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                    let data = {};
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        throw new Error(`Nem JSON válasz (${response.status}). Kezdet: ${text.slice(0, 160)}`);
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(readHoroscopeChatError(data, 'A chat hívás sikertelen.'));
+                    }
+
+                    horoscopeChatAnswer.value = data.response || '';
+                } catch (error) {
+                    horoscopeChatAnswer.value = '';
+                    setHoroscopeChatError(error?.message || 'Ismeretlen hiba a chat során.');
+                } finally {
+                    horoscopeChatBusy = false;
+                    horoscopeChatQuestion.disabled = false;
+                    if (horoscopeChatSend) horoscopeChatSend.disabled = false;
+                    adjustHoroscopeChatAnswerHeight();
+                    adjustHoroscopeChatQuestionHeight();
+                    horoscopeChatQuestion.focus();
+                }
+            }
+
+            function readHoroscopeChatError(data, fallback) {
+                if (data?.error) return data.error;
+                if (data?.message) return data.message;
+                if (data?.errors) {
+                    const first = Object.values(data.errors).flat()[0];
+                    if (first) return first;
+                }
+                return fallback;
+            }
+
+            horoscopeChatSend?.addEventListener('click', sendHoroscopeChatQuestion);
+
+            horoscopeChatQuestion?.addEventListener('input', adjustHoroscopeChatQuestionHeight);
+
+            horoscopeChatQuestion?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendHoroscopeChatQuestion();
+                }
+            });
+
+            adjustHoroscopeChatQuestionHeight();
+            adjustHoroscopeChatAnswerHeight();
     </script>
 </x-app-layout>

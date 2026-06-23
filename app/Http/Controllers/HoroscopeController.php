@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -53,6 +54,43 @@ class HoroscopeController extends Controller
             Log::warning('Nominatim geocode failed', ['error' => $error->getMessage()]);
 
             return response()->json(['results' => []], 500);
+        }
+    }
+
+    public function chat(Request $request)
+    {
+        $validated = $request->validate([
+            'prompt' => ['required', 'string', 'max:4000'],
+            'chart' => ['nullable', 'array'],
+        ]);
+
+        try {
+            $system = implode("\n", [
+                'Te egy asztrológiai asszisztens vagy.',
+                'Válaszolj magyarul, tömören és érthetően.',
+                'A kérdés az aktuális horoszkóp ábrához kapcsolódik.',
+            ]);
+
+            if (! empty($validated['chart'])) {
+                $system .= "\n\nAktuális horoszkóp adatok (JSON):\n"
+                    .json_encode($validated['chart'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+
+            $result = app(ChatService::class)->sendWithSystem(
+                $request->user(),
+                $validated['prompt'],
+                $system
+            );
+
+            return response()->json([
+                'response' => $result['answer'],
+            ]);
+        } catch (\Throwable $error) {
+            Log::error('Horoscope chat failed', ['error' => $error->getMessage()]);
+
+            return response()->json([
+                'error' => $error->getMessage() ?: 'A chat hívás sikertelen.',
+            ], 500);
         }
     }
 

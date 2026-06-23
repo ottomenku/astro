@@ -242,6 +242,19 @@ class ChatService
      */
     public function send(User $user, string $prompt, ?string $model = null): array
     {
+        return $this->sendWithSystem(
+            $user,
+            $prompt,
+            'Te egy asztrológiai asszisztens vagy. Válaszolj magyarul, tömören és érthetően.',
+            $model
+        );
+    }
+
+    /**
+     * @return array{conversation: Conversation, answer: string, usage: array}
+     */
+    public function sendWithSystem(User $user, string $prompt, string $systemContent, ?string $model = null): array
+    {
         $this->ensureQuota($user);
 
         $apiKey = (string) config('services.openai.api_key');
@@ -250,7 +263,7 @@ class ChatService
         }
 
         $response = $this->client->chat([
-            ['role' => 'system', 'content' => 'Te egy asztrológiai asszisztens vagy. Válaszolj magyarul, tömören és érthetően.'],
+            ['role' => 'system', 'content' => $systemContent],
             ['role' => 'user', 'content' => $prompt],
         ], $model);
 
