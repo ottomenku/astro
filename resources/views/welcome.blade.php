@@ -11,9 +11,67 @@
             width: calc(100% - 40px);
             margin-left: 20px;
             margin-right: 20px;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .login-form-inner-x {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .login-form-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .login-form-btn {
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.5rem 1.25rem;
+            transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .login-form-btn-primary {
+            background-color: #eab308;
+            color: #000;
+        }
+
+        .login-form-btn-primary:hover {
+            background-color: #facc15;
+        }
+
+        .login-form-btn-secondary {
+            border: 1px solid rgba(234, 179, 8, 0.5);
+            color: #facc15;
+        }
+
+        .login-form-btn-secondary:hover {
+            border-color: #facc15;
+            color: #fde047;
+        }
+
+        .login-title {
+            font-size: 5.85rem;
+            line-height: 1;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            letter-spacing: 0.025em;
+            text-align: center;
         }
 
         @media (min-width: 768px) {
+            .login-title {
+                font-size: 7.8rem;
+            }
+
             .login-form-card {
                 width: 100%;
                 max-width: 500px;
@@ -29,27 +87,17 @@
      style="background-image: url('{{ asset('images/astro-motto-hero.png') }}');">
 
     <div class="relative z-10 w-full text-center">
-        <h1 class="text-7xl md:text-8xl font-bold mb-3 tracking-wide text-center">
+        <h1 class="login-title">
             Astro MOtto
         </h1>
 
-        <p class="text-slate-200 mb-4 text-lg text-center">
-            Bejelentkezés
-        </p>
-
-        <div class="mb-6 text-center">
-            <a href="{{ route('register') }}" class="underline text-sm text-slate-200 hover:text-white">
-                Még nincs fiókod? Regisztráció
-            </a>
-        </div>
-
-        <div class="login-form-card bg-black/70 backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-8 shadow-2xl">
+        <div class="login-form-card bg-black/70 backdrop-blur-xl border border-yellow-500/30 rounded-2xl shadow-2xl">
             @if (session('status'))
-                <p class="mb-4 text-sm text-green-400 text-left">{{ session('status') }}</p>
+                <p class="login-form-inner-x mb-4 text-sm text-green-400 text-left">{{ session('status') }}</p>
             @endif
 
             @if ($errors->any())
-                <div class="mb-4 text-sm text-red-400 text-left">
+                <div class="login-form-inner-x mb-4 text-sm text-red-400 text-left">
                     @foreach ($errors->all() as $error)
                         <p>{{ $error }}</p>
                     @endforeach
@@ -59,7 +107,7 @@
             <form method="POST" action="{{ route('login') }}" class="space-y-5">
                 @csrf
 
-                <div class="text-left">
+                <div class="login-form-inner-x text-left">
                     <label class="block text-sm mb-1 text-slate-300">Email</label>
                     <input type="email"
                            name="email"
@@ -69,7 +117,7 @@
                            class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500">
                 </div>
 
-                <div class="text-left">
+                <div class="login-form-inner-x text-left">
                     <label class="block text-sm mb-1 text-slate-300">Jelszó</label>
                     <input type="password"
                            name="password"
@@ -77,10 +125,14 @@
                            class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500">
                 </div>
 
-                <button type="submit"
-                        class="w-full rounded-lg bg-yellow-500 hover:bg-yellow-400 text-black font-semibold py-3 transition">
-                    Belépés
-                </button>
+                <div class="login-form-actions">
+                    <button type="submit" class="login-form-btn login-form-btn-primary">
+                        Belépés
+                    </button>
+                    <a href="{{ route('register') }}" class="login-form-btn login-form-btn-secondary">
+                        Regisztráció
+                    </a>
+                </div>
             </form>
         </div>
     </div>
