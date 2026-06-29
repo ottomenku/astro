@@ -1594,7 +1594,9 @@
                     const data = await response.json();
                     if (seq !== calculateSeq) return;
                     if (!response.ok) {
-                        throw new Error(data.error || 'Ismeretlen hiba');
+                        const err = new Error(data.error || 'Ismeretlen hiba');
+                        err.details = data.details || '';
+                        throw err;
                     }
 
                     if (showNatalCheckbox.checked) {

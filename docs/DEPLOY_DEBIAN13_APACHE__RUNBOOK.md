@@ -266,6 +266,57 @@ Mit tegyél:
 2) `.env`: `HOROSCOPE_PYTHON_BIN=/var/www/astro/.venv/bin/python`
 3) `php artisan optimize:clear` + PHP-FPM restart
 
+### 13.3 Horoszkóp számítás sikertelen (Python / swisseph)
+
+**Tünet:** „A horoszkóp számítás sikertelen” az oldalon.
+
+**Diagnosztika:**
+
+```bash
+cd /var/www/astro
+
+# .env-ben legyen (dupla prefix NEM):
+grep HOROSCOPE_PYTHON_BIN .env
+
+# Python + swisseph működik?
+/var/www/astro/.venv/bin/python -c "import swisseph; print('swisseph OK')"
+
+# www-data is el tudja indítani?
+sudo -u www-data /var/www/astro/.venv/bin/python -c "import swisseph; print('OK')"
+
+# Teszt számítás stdin-nel
+echo '{"natal":{"datetime_utc":"1990-05-15T12:30:00Z","lat":47.5,"lon":19.0},"transit":{"datetime_utc":"2026-06-29T12:00:00Z","lat":47.5,"lon":19.0},"sidereal":false,"ayanamsa":"lahiri","house_system":"placidus"}' | sudo -u www-data /var/www/astro/.venv/bin/python /var/www/astro/python/horoscope_calc.py | head -c 200
+
+# Laravel log
+tail -n 30 storage/logs/laravel.log | grep -i horoscope
+```
+
+**Telepítés (ha a venv hiányzik vagy nincs swisseph):**
+
+```bash
+cd /var/www/astro
+python3 -m venv .venv
+sudo -u www-data .venv/bin/pip install --upgrade pip
+sudo -u www-data .venv/bin/pip install -r python/requirements.txt
+```
+
+**.env** (csak az útvonal!):
+
+```env
+HOROSCOPE_PYTHON_BIN=/var/www/astro/.venv/bin/python
+```
+
+Cache + PHP-FPM (config cache után kötelező):
+
+```bash
+sudo -u www-data php artisan optimize:clear
+sudo -u www-data php artisan optimize
+sudo systemctl restart php8.4-fpm || sudo systemctl restart php8.3-fpm
+sudo systemctl reload apache2
+```
+
+---
+
 ### 13.2 Hol a php-fpm socket?
 
 ```bash
@@ -280,12 +331,73 @@ systemctl status php*-fpm --no-pager
 ```bash
 cd /var/www/astro
 git pull
-composer install --no-dev --optimize-autoloader
-php artisan migrate --force
+sudo mkdir -p storage/logs storage/framework/{cache,sessions,views} bootstrap/cache
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R ug+rwX storage bootstrap/cache
+composer install --no-dev --optimize-autoloader --no-scripts
+sudo -u www-data php artisan package:discover --ansi
+sudo -u www-data php artisan migrate --force
 npm ci
 npm run build
-php artisan optimize
+sudo -u www-data php artisan optimize:clear
+sudo -u www-data php artisan optimize
 sudo chown -R www-data:www-data storage bootstrap/cache
 sudo chmod -R ug+rwX storage bootstrap/cache
 sudo systemctl reload apache2
+```
+
+### 14.1 Gyakori hiba: PailServiceProvider / Permission denied (log)
+
+Ha ezt látod:
+- `Class "Laravel\Pail\PailServiceProvider" not found`
+- `storage/logs/laravel.log ... Permission denied`
+
+**Ok:** elavult cache (`bootstrap/cache`) dev csomagokkal, vagy a `storage/` nem írható a web usernek.
+
+**Javítás** — **először jogosultság**, utána composer:
+
+```bash
+cd /var/www/astro
+
+# 1) Cache kézzel — artisan nélkül (sudo, ha root tulajdonban van)
+sudo rm -f bootstrap/cache/packages.php
+sudo rm -f bootstrap/cache/services.php
+sudo rm -f bootstrap/cache/config.php
+sudo rm -f bootstrap/cache/routes-v7.php
+
+# 2) Jogosultságok
+sudo mkdir -p storage/logs storage/framework/{cache,sessions,views} bootstrap/cache
+sudo touch storage/logs/laravel.log
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R ug+rwX storage bootstrap/cache
+sudo chmod 664 storage/logs/laravel.log
+
+# 3) Függőségek — --no-scripts, mert a post-script azonnal artisan-t hív
+composer install --no-dev --optimize-autoloader --no-scripts
+
+# 4) Artisan www-data userrel
+sudo -u www-data php artisan package:discover --ansi
+sudo -u www-data php artisan migrate --force
+sudo -u www-data php artisan optimize:clear
+sudo -u www-data php artisan optimize
+
+# 5) Apache
+sudo systemctl reload apache2
+```
+
+**Alternatíva:** deploy user + www-data csoport (utána `composer install` script nélkül is mehet):
+
+```bash
+sudo usermod -aG www-data "$USER"
+sudo chown -R "$USER":www-data storage bootstrap/cache
+sudo chmod -R ug+rwX storage bootstrap/cache
+# kijelentkezés/bejelentkezés vagy: newgrp www-data
+composer install --no-dev --optimize-autoloader
+```
+
+**Ellenőrzés:**
+
+```bash
+sudo -u www-data php artisan about
+ls -la storage/logs/laravel.log
 ```

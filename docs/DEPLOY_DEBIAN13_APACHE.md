@@ -231,6 +231,7 @@ composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 npm ci
 npm run build
+php artisan optimize:clear
 php artisan optimize
 sudo chown -R www-data:www-data storage bootstrap/cache
 sudo chmod -R ug+rwX storage bootstrap/cache

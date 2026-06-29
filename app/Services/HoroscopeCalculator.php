@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\HoroscopePython;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -43,13 +44,6 @@ class HoroscopeCalculator
 
     protected function resolvePythonBinary(): string
     {
-        $defaultPython = PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3';
-        $pythonFromEnv = (string) env('HOROSCOPE_PYTHON_BIN', '');
-
-        if (PHP_OS_FAMILY === 'Windows' && ($pythonFromEnv === '' || $pythonFromEnv === 'python3')) {
-            return 'python';
-        }
-
-        return $pythonFromEnv !== '' ? $pythonFromEnv : $defaultPython;
+        return HoroscopePython::binary();
     }
 }

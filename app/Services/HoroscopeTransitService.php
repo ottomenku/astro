@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\HoroscopePython;
 use Symfony\Component\Process\Process;
 
 class HoroscopeTransitService
@@ -61,14 +62,7 @@ class HoroscopeTransitService
     private function runPythonCalculator(array $payload): array
     {
         $script = base_path('python/horoscope_calc.py');
-        $defaultPython = PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3';
-        $pythonFromEnv = (string) env('HOROSCOPE_PYTHON_BIN', '');
-
-        if (PHP_OS_FAMILY === 'Windows' && ($pythonFromEnv === '' || $pythonFromEnv === 'python3')) {
-            $python = 'python';
-        } else {
-            $python = $pythonFromEnv !== '' ? $pythonFromEnv : $defaultPython;
-        }
+        $python = HoroscopePython::binary();
 
         $process = new Process([$python, $script]);
         $process->setTimeout(30);

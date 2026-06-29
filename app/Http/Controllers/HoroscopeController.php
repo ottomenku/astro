@@ -142,7 +142,7 @@ class HoroscopeController extends Controller
 
             return response()->json([
                 'error' => 'A horoszkóp számítás sikertelen.',
-                'details' => $error->getMessage(),
+                'details' => trim($error->getMessage()) ?: null,
             ], 500);
         }
     }
