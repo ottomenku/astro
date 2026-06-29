@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -86,6 +86,13 @@
 <div class="min-h-screen flex items-center justify-center bg-cover bg-center relative"
      style="background-image: url('{{ asset('images/astro-motto-hero.png') }}');">
 
+    <div class="absolute top-4 right-4 z-20">
+        @include('partials.locale-select', [
+            'id' => 'welcomeLocaleSelect',
+            'selectClass' => 'rounded-lg bg-black/70 border border-yellow-500/30 text-white text-sm px-2 py-1.5',
+        ])
+    </div>
+
     <div class="relative z-10 w-full text-center">
         <h1 class="login-title">
             Astro MOtto
@@ -118,7 +125,7 @@
                 </div>
 
                 <div class="login-form-inner-x text-left">
-                    <label class="block text-sm mb-1 text-slate-300">Jelszó</label>
+                    <label class="block text-sm mb-1 text-slate-300">{{ __('app.password') }}</label>
                     <input type="password"
                            name="password"
                            required
@@ -127,10 +134,10 @@
 
                 <div class="login-form-actions">
                     <button type="submit" class="login-form-btn login-form-btn-primary">
-                        Belépés
+                        {{ __('app.login') }}
                     </button>
                     <a href="{{ route('register') }}" class="login-form-btn login-form-btn-secondary">
-                        Regisztráció
+                        {{ __('app.register') }}
                     </a>
                 </div>
             </form>

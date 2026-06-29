@@ -10,8 +10,6 @@ use Illuminate\Validation\Rule;
 class ProfileUpdateRequest extends FormRequest
 {
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -26,12 +24,6 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
-
-            // jelenlegi hely (tranzitokhoz)
-            'current_tz_offset' => ['nullable', 'numeric', 'between:-14,14'],
-            'current_place_label' => ['nullable', 'string', 'max:255'],
-            'current_lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'current_lon' => ['nullable', 'numeric', 'between:-180,180'],
         ];
     }
 }

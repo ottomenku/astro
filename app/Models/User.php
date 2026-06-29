@@ -37,6 +37,9 @@ class User extends Authenticatable
         'current_lat',
         'current_lon',
 
+        'house_system',
+        'zodiac_mode',
+
         'tier',
         'is_admin',
         'token_quota_total',
@@ -74,6 +77,18 @@ class User extends Authenticatable
     public function horoscopes(): HasMany
     {
         return $this->hasMany(UserHoroscope::class);
+    }
+
+    public function birthCharts(): HasMany
+    {
+        return $this->hasMany(BirthChart::class);
+    }
+
+    public function defaultBirthChart(): ?BirthChart
+    {
+        $default = $this->birthCharts()->where('is_default', true)->first();
+
+        return $default ?? $this->birthCharts()->latest()->first();
     }
 
     public function chatThreads(): HasMany

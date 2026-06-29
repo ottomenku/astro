@@ -6,7 +6,6 @@ use App\Services\ChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process;
 
 class HoroscopeController extends Controller
 {
@@ -15,7 +14,23 @@ class HoroscopeController extends Controller
 
     public function index()
     {
-        return view('horoscope');
+        $user = auth()->user();
+
+        $birthCharts = $user?->birthCharts()->orderByDesc('is_default')->orderBy('name')->get() ?? collect();
+
+        return view('horoscope', [
+            'birthCharts' => $birthCharts,
+            'birthChartsJson' => $birthCharts->map(fn ($chart) => [
+                'id' => $chart->id,
+                'name' => $chart->name,
+                'datetime_utc' => $chart->birth_datetime_utc?->utc()->toIso8601String(),
+                'offset' => $chart->birth_tz_offset,
+                'label' => $chart->birth_place_label,
+                'lat' => $chart->birth_lat,
+                'lon' => $chart->birth_lon,
+                'is_default' => $chart->is_default,
+            ])->values(),
+        ]);
     }
 
     public function geocode(Request $request)
@@ -114,57 +129,20 @@ class HoroscopeController extends Controller
             'natal' => $validated['natal'],
             'transit' => $validated['transit'],
             'sidereal' => (bool) ($validated['sidereal'] ?? false),
-            // csak akkor értelmes, ha sidereal=true
             'ayanamsa' => $validated['ayanamsa'] ?? 'lahiri',
             'house_system' => $validated['house_system'] ?? 'placidus',
         ];
 
-        $script = base_path('python/horoscope_calc.py');
-        $defaultPython = PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3';
-        $pythonFromEnv = (string) env('HOROSCOPE_PYTHON_BIN', '');
-        // Windows alatt gyakran van külön "python3" shim (pl. Store), amiben nincs telepítve a swisseph.
-        // Ha a .env-ben nincs explicit bin megadva, vagy valaki python3-at állított be, akkor is inkább a "python"-t használjuk.
-        if (PHP_OS_FAMILY === 'Windows' && ($pythonFromEnv === '' || $pythonFromEnv === 'python3')) {
-            $python = 'python';
-        } else {
-            $python = $pythonFromEnv !== '' ? $pythonFromEnv : $defaultPython;
-        }
-        $process = new Process([$python, $script]);
-        $process->setTimeout(30);
-        $process->setInput(json_encode($payload));
-
         try {
-            $process->run();
-
-            if (! $process->isSuccessful()) {
-                Log::error('Horoscope calc failed', [
-                    'python' => $python,
-                    'script' => $script,
-                    'error' => $process->getErrorOutput(),
-                    'output' => $process->getOutput(),
-                ]);
-
-                return response()->json([
-                    'error' => 'A horoszkóp számítás sikertelen.',
-                    'details' => $process->getErrorOutput(),
-                    'python' => $python,
-                ], 500);
-            }
-
-            $data = json_decode($process->getOutput(), true);
-            if (! is_array($data)) {
-                return response()->json([
-                    'error' => 'Érvénytelen válasz a számítóból.',
-                    'details' => $process->getOutput(),
-                ], 500);
-            }
+            $data = app(\App\Services\HoroscopeCalculator::class)->calculate($payload);
 
             return response()->json($data);
         } catch (\Throwable $error) {
             Log::error('Horoscope calc exception', ['error' => $error->getMessage()]);
 
             return response()->json([
-                'error' => 'Hiba történt a számítás során.',
+                'error' => 'A horoszkóp számítás sikertelen.',
+                'details' => $error->getMessage(),
             ], 500);
         }
     }

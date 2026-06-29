@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\ProfileBirthChartController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfileHoroscopeController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatThreadController;
 use App\Http\Controllers\HoroscopeController;
@@ -9,6 +12,8 @@ use App\Http\Controllers\Admin\AdminConversationController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminVisitorController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -26,6 +31,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile/horoscope', [ProfileHoroscopeController::class, 'edit'])->name('profile.horoscope.edit');
+    Route::patch('/profile/horoscope', [ProfileHoroscopeController::class, 'update'])->name('profile.horoscope.update');
+
+    Route::get('/profile/birth-charts', [ProfileBirthChartController::class, 'index'])->name('profile.birth-charts.index');
+    Route::get('/profile/birth-charts/create', [ProfileBirthChartController::class, 'create'])->name('profile.birth-charts.create');
+    Route::post('/profile/birth-charts', [ProfileBirthChartController::class, 'store'])->name('profile.birth-charts.store');
+    Route::get('/profile/birth-charts/{birthChart}/edit', [ProfileBirthChartController::class, 'edit'])->name('profile.birth-charts.edit');
+    Route::patch('/profile/birth-charts/{birthChart}', [ProfileBirthChartController::class, 'update'])->name('profile.birth-charts.update');
+    Route::delete('/profile/birth-charts/{birthChart}', [ProfileBirthChartController::class, 'destroy'])->name('profile.birth-charts.destroy');
 
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
     Route::get('/chat/models', [ChatController::class, 'models'])->name('chat.models');

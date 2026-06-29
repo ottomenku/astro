@@ -72,7 +72,9 @@ class HoroscopeService
 
     private function buildNatalPayloadFromUser(User $user, array $options): array
     {
-        if (! $user->birth_datetime_utc || $user->birth_lat === null || $user->birth_lon === null) {
+        $chart = $user->defaultBirthChart();
+
+        if (! $chart || ! $chart->birth_datetime_utc || $chart->birth_lat === null || $chart->birth_lon === null) {
             throw new \RuntimeException('Hiányos születési adat – nem számolható natál képlet.');
         }
 
@@ -81,9 +83,9 @@ class HoroscopeService
 
         // A python két chartot vár (natal+transit). Natálnál transit = natal (mert most csak natált mentünk)
         $entry = [
-            'datetime_utc' => $user->birth_datetime_utc->toISOString(),
-            'lat' => (float) $user->birth_lat,
-            'lon' => (float) $user->birth_lon,
+            'datetime_utc' => $chart->birth_datetime_utc->utc()->toIso8601String(),
+            'lat' => (float) $chart->birth_lat,
+            'lon' => (float) $chart->birth_lon,
         ];
 
         return [
