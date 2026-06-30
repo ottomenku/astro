@@ -9,10 +9,28 @@
     <select
         name="locale"
         id="{{ $id }}"
-        class="{{ $selectClass }}"
+        class="locale-select {{ $selectClass }}"
         onchange="this.form.submit()"
     >
         <option value="hu" @selected(app()->getLocale() === 'hu')>HU</option>
         <option value="en" @selected(app()->getLocale() === 'en')>EN</option>
     </select>
 </form>
+
+@once
+    <style>
+        select.locale-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: none !important;
+            cursor: pointer;
+            text-align: center;
+            text-align-last: center;
+        }
+
+        select.locale-select::-ms-expand {
+            display: none;
+        }
+    </style>
+@endonce

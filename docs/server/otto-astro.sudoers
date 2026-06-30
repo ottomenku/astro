@@ -1,0 +1,28 @@
+# Astro deploy — jelszómentes sudo az otto usernek
+# Telepítés: sudo visudo -f /etc/sudoers.d/otto-astro
+# (majd ezt a tartalmat másold be, vagy: sudo cp otto-astro.sudoers /etc/sudoers.d/otto-astro && sudo chmod 440 /etc/sudoers.d/otto-astro)
+
+Defaults:otto !requiretty
+
+# Laravel artisan www-data-ként
+otto ALL=(www-data) NOPASSWD: /usr/bin/php /var/www/astro/artisan *
+
+# Webszerver / PHP-FPM
+otto ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload apache2
+otto ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart php8.4-fpm
+
+# Jogosultságok (deploy után)
+otto ALL=(ALL) NOPASSWD: /usr/bin/chown -R www-data\:www-data /var/www/astro/storage /var/www/astro/bootstrap/cache
+otto ALL=(ALL) NOPASSWD: /usr/bin/chmod -R ug+rwX /var/www/astro/storage /var/www/astro/bootstrap/cache
+otto ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /var/www/astro/storage/logs
+otto ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /var/www/astro/storage/framework/cache
+otto ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /var/www/astro/storage/framework/sessions
+otto ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /var/www/astro/storage/framework/views
+otto ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /var/www/astro/bootstrap/cache
+otto ALL=(ALL) NOPASSWD: /usr/bin/touch /var/www/astro/storage/logs/laravel.log
+
+# Cache fájlok törlése (Pail / config cache javításhoz)
+otto ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/www/astro/bootstrap/cache/packages.php
+otto ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/www/astro/bootstrap/cache/services.php
+otto ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/www/astro/bootstrap/cache/config.php
+otto ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/www/astro/bootstrap/cache/routes-v7.php

@@ -14,8 +14,48 @@
             <div class="bg-white shadow-sm rounded-lg">
                 <div class="p-6">
                     <div class="relative flex flex-wrap gap-2 border-b pb-3 items-center" x-data="{ menuOpen: false }">
-                        <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="chart" id="tabChart">{{ __('horoscope.chart_tab') }}</button>
-                        <button type="button" class="px-3 py-2 rounded border border-gray-300" data-tab="tables" id="tabTables">{{ __('horoscope.tables_tab') }}</button>
+                        <button
+                            type="button"
+                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
+                            data-tab="chart"
+                            id="tabChart"
+                            title="{{ __('horoscope.chart_tab') }}"
+                            aria-label="{{ __('horoscope.chart_tab') }}"
+                        >
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" />
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M12 3v18M3 12h18" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
+                            data-tab="tables"
+                            id="tabTables"
+                            title="{{ __('horoscope.tables_tab') }}"
+                            aria-label="{{ __('horoscope.tables_tab') }}"
+                        >
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
+                            data-tab="dual"
+                            id="tabDual"
+                            title="{{ __('horoscope.dual_tab') }}"
+                            aria-label="{{ __('horoscope.dual_tab') }}"
+                        >
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="8.5" cy="12" r="5.5" />
+                                <circle cx="15.5" cy="12" r="5.5" />
+                                <path d="M8.5 6.5v11M2.5 12h12" opacity="0.85" />
+                                <path d="M15.5 6.5v11M9.5 12h12" opacity="0.85" />
+                            </svg>
+                        </button>
                         @include('partials.locale-select')
                         <button
                             type="button"
@@ -146,6 +186,19 @@
                                         </div>
                                     </div>
 
+                                    <div class="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-200">
+                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" id="setNow">{{ __('horoscope.now') }}</button>
+                                        <select id="birthChartSelect" class="px-3 py-1.5 rounded border border-gray-300 text-sm max-w-xs min-w-[10rem]" aria-label="{{ __('horoscope.birth_time') }}">
+                                            <option value="">{{ __('horoscope.birth_chart_select') }}</option>
+                                            @foreach ($birthCharts as $chart)
+                                                @php $parts = $chart->localBirthParts(); @endphp
+                                                <option value="{{ $chart->id }}" @selected($chart->is_default)>
+                                                    {{ $chart->name }} — {{ $parts['date'] }} {{ $parts['time'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
                                     <div>
                                         <div class="block text-sm font-medium text-gray-700">{{ __('horoscope.time_stepping') }}</div>
 
@@ -259,15 +312,47 @@
                                             </div>
                                         </div>
 
+                                        <div class="mt-3">
+                                            <button
+                                                class="px-3 py-1.5 rounded border border-gray-300 text-sm"
+                                                type="button"
+                                                id="resetNowStepping"
+                                            >{{ __('horoscope.step_reset_now') }}</button>
+                                        </div>
+
                                         <div class="mt-1 text-xs text-gray-500">{{ __('horoscope.step_hint') }}</div>
                                     </div>
                                 </div>
                             </details>
+                        </div>
+                    </div>
 
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <button class="px-3 py-1.5 rounded border border-gray-300" type="button" id="setNow">{{ __('horoscope.now') }}</button>
-                                <select id="birthChartSelect" class="px-3 py-1.5 rounded border border-gray-300 text-sm max-w-xs min-w-[10rem]" aria-label="{{ __('horoscope.birth_time') }}">
+                    <div class="mt-4 hidden" id="panelDual">
+                        <div class="max-w-xl mx-auto mb-3">
+                            <h3 class="font-semibold">{{ __('horoscope.dual_heading') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">{{ __('horoscope.dual_hint') }}</p>
+                        </div>
+
+                        <div class="max-w-xl mx-auto" id="dualChartShell">
+                            <svg class="w-full h-auto" viewBox="0 0 400 400" role="img" aria-label="{{ __('horoscope.dual_aria') }}" id="dualChartSvg"></svg>
+                        </div>
+
+                        <div class="mt-6 max-w-xl mx-auto space-y-4">
+                            <div class="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+                                <div class="text-sm font-semibold text-blue-800">{{ __('horoscope.dual_a') }}</div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500" for="dualADate">{{ __('horoscope.date') }}</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm" type="date" id="dualADate">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500" for="dualATime">{{ __('horoscope.time') }}</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm" type="time" id="dualATime" step="60">
+                                    </div>
+                                </div>
+                                <select id="dualBirthChartSelectA" class="w-full px-3 py-1.5 rounded border border-blue-200 text-sm bg-white" aria-label="{{ __('horoscope.dual_load_a') }}">
                                     <option value="">{{ __('horoscope.birth_chart_select') }}</option>
+                                    <option value="now">{{ __('horoscope.now') }}</option>
                                     @foreach ($birthCharts as $chart)
                                         @php $parts = $chart->localBirthParts(); @endphp
                                         <option value="{{ $chart->id }}" @selected($chart->is_default)>
@@ -275,6 +360,38 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <div class="hidden space-y-3 pt-2 border-t border-blue-100" id="dualANowStepping">
+                                    <div class="text-xs font-medium text-gray-600">{{ __('horoscope.time_stepping') }}</div>
+                                    @include('partials.horoscope-dual-stepper', ['side' => 'a'])
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-red-200 bg-red-50/40 p-4 space-y-3">
+                                <div class="text-sm font-semibold text-red-800">{{ __('horoscope.dual_b') }}</div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500" for="dualBDate">{{ __('horoscope.date') }}</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm" type="date" id="dualBDate">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500" for="dualBTime">{{ __('horoscope.time') }}</label>
+                                        <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm" type="time" id="dualBTime" step="60">
+                                    </div>
+                                </div>
+                                <select id="dualBirthChartSelectB" class="w-full px-3 py-1.5 rounded border border-red-200 text-sm bg-white" aria-label="{{ __('horoscope.dual_load_b') }}">
+                                    <option value="">{{ __('horoscope.birth_chart_select') }}</option>
+                                    <option value="now">{{ __('horoscope.now') }}</option>
+                                    @foreach ($birthCharts as $chart)
+                                        @php $parts = $chart->localBirthParts(); @endphp
+                                        <option value="{{ $chart->id }}">
+                                            {{ $chart->name }} — {{ $parts['date'] }} {{ $parts['time'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="hidden space-y-3 pt-2 border-t border-red-100" id="dualBNowStepping">
+                                    <div class="text-xs font-medium text-gray-600">{{ __('horoscope.time_stepping') }}</div>
+                                    @include('partials.horoscope-dual-stepper', ['side' => 'b'])
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -516,6 +633,8 @@
             // régi "Natal → tranzit" gomb már nincs a tabos UI-ban
             const copyButton = null;
             const chartSvg = document.getElementById('chartSvg');
+            const dualChartSvg = document.getElementById('dualChartSvg');
+            let chartRoot = chartSvg;
             const natalTable = document.getElementById('natalTable');
             const transitTable = document.getElementById('transitTable');
             const zodiacModeSelect = document.getElementById('zodiacMode');
@@ -526,8 +645,43 @@
             const aspectsTable = document.getElementById('aspectsTable');
             const tabChart = document.getElementById('tabChart');
             const tabTables = document.getElementById('tabTables');
+            const tabDual = document.getElementById('tabDual');
             const panelChart = document.getElementById('panelChart');
             const panelTables = document.getElementById('panelTables');
+            const panelDual = document.getElementById('panelDual');
+            const dualADate = document.getElementById('dualADate');
+            const dualATime = document.getElementById('dualATime');
+            const dualBDate = document.getElementById('dualBDate');
+            const dualBTime = document.getElementById('dualBTime');
+            const dualBirthChartSelectA = document.getElementById('dualBirthChartSelectA');
+            const dualBirthChartSelectB = document.getElementById('dualBirthChartSelectB');
+            const dualANowStepping = document.getElementById('dualANowStepping');
+            const dualBNowStepping = document.getElementById('dualBNowStepping');
+            let activeTabName = 'chart';
+            let dualBooted = false;
+            const dualChartMeta = {
+                a: { lat: null, lon: null, offset: 2 },
+                b: { lat: null, lon: null, offset: 2 },
+            };
+            const DUAL_BLUE = '#2563eb';
+            const DUAL_RED = '#dc2626';
+            const UNASPECTED_PLANET_OPACITY = 0.32;
+
+            function buildAspectedNames(aspects) {
+                const names = new Set();
+                aspects.forEach(({ p1, p2 }) => {
+                    names.add(p1.name);
+                    names.add(p2.name);
+                });
+                return names;
+            }
+
+            function planetDisplayOpacity(name, aspectedNames) {
+                if (!aspectedNames) {
+                    return 1;
+                }
+                return aspectedNames.has(name) ? 1 : UNASPECTED_PLANET_OPACITY;
+            }
             const chartSettingsToggle = document.getElementById('chartSettingsToggle');
             const chartSettingsPanel = document.getElementById('chartSettingsPanel');
             const chartSettingsReset = document.getElementById('chartSettingsReset');
@@ -602,16 +756,24 @@
             }
 
             let calculateSeq = 0;
+            let dualCalculateSeq = 0;
 
             function setActiveTab(name) {
-                const btnOn = 'px-3 py-2 rounded bg-indigo-600 text-white';
-                const btnOff = 'px-3 py-2 rounded border border-gray-300';
+                activeTabName = name;
+                const btnOn = 'px-3 py-2 rounded bg-indigo-600 text-white inline-flex items-center justify-center';
+                const btnOff = 'px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center';
 
                 tabChart.className = name === 'chart' ? btnOn : btnOff;
                 tabTables.className = name === 'tables' ? btnOn : btnOff;
+                tabDual.className = name === 'dual' ? btnOn : btnOff;
 
                 panelChart.classList.toggle('hidden', name !== 'chart');
                 panelTables.classList.toggle('hidden', name !== 'tables');
+                panelDual.classList.toggle('hidden', name !== 'dual');
+
+                if (name === 'dual') {
+                    bootDualChart();
+                }
             }
 
             function resetChartSettingsToProfile() {
@@ -636,6 +798,9 @@
                 el?.addEventListener('change', () => {
                     updateModeHint();
                     calculate();
+                    if (activeTabName === 'dual') {
+                        calculateDual();
+                    }
                 });
             });
             function renderAspectsTable(target, planets) {
@@ -728,6 +893,47 @@
                 transitInputs.time.value = time;
 
                 calculate();
+            }
+
+            function shiftDualTimeBySeconds(side, deltaSeconds) {
+                const err = validateDualSide(side);
+                if (err) {
+                    errorBox.textContent = err;
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const { date, time, meta } = getDualInputs(side);
+                const utcMs = localToUtcMs(date.value, time.value, meta.offset);
+                const nextLocal = utcMsToLocalInputs(utcMs + deltaSeconds * 1000, meta.offset);
+                date.value = nextLocal.date;
+                time.value = nextLocal.time;
+                calculateDual();
+            }
+
+            function shiftDualTimeByMonths(side, deltaMonths) {
+                const err = validateDualSide(side);
+                if (err) {
+                    errorBox.textContent = err;
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const { date, time, meta } = getDualInputs(side);
+                const utcMs = localToUtcMs(date.value, time.value, meta.offset);
+                const localMs = utcMs + meta.offset * 60 * 60 * 1000;
+                const dt = new Date(localMs);
+                dt.setUTCMonth(dt.getUTCMonth() + deltaMonths);
+
+                const pad = (v) => String(v).padStart(2, '0');
+                date.value = `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+                time.value = `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`;
+                calculateDual();
+            }
+
+            function updateDualNowSteppingVisibility() {
+                dualANowStepping?.classList.toggle('hidden', dualBirthChartSelectA?.value !== 'now');
+                dualBNowStepping?.classList.toggle('hidden', dualBirthChartSelectB?.value !== 'now');
             }
 
             function setDefaultCoords() {
@@ -891,7 +1097,7 @@
             }
 
             function clearChart() {
-                chartSvg.innerHTML = '';
+                chartRoot.innerHTML = '';
 
                 // alap gyűrűk
                 const zodiacOuter = svgEl('circle');
@@ -902,7 +1108,7 @@
                 // a zodiákus külső köre a legkülső
                 zodiacOuter.setAttribute('stroke', '#212529');
                 zodiacOuter.setAttribute('stroke-width', '2');
-                chartSvg.appendChild(zodiacOuter);
+                chartRoot.appendChild(zodiacOuter);
 
                 const zodiacInner = svgEl('circle');
                 zodiacInner.setAttribute('cx', CHART.cx);
@@ -911,7 +1117,7 @@
                 zodiacInner.setAttribute('fill', 'none');
                 zodiacInner.setAttribute('stroke', '#343a40');
                 zodiacInner.setAttribute('stroke-width', '1');
-                chartSvg.appendChild(zodiacInner);
+                chartRoot.appendChild(zodiacInner);
 
                 const houseInner = svgEl('circle');
                 houseInner.setAttribute('cx', CHART.cx);
@@ -920,7 +1126,7 @@
                 houseInner.setAttribute('fill', 'none');
                 houseInner.setAttribute('stroke', '#6c757d');
                 houseInner.setAttribute('stroke-width', '1');
-                chartSvg.appendChild(houseInner);
+                chartRoot.appendChild(houseInner);
 
                 const inner = svgEl('circle');
                 inner.setAttribute('cx', CHART.cx);
@@ -929,38 +1135,51 @@
                 inner.setAttribute('fill', '#fff');
                 inner.setAttribute('stroke', '#6c757d');
                 inner.setAttribute('stroke-width', '1');
-                chartSvg.appendChild(inner);
+                chartRoot.appendChild(inner);
 
                 // rétegek sorrendben
                 const ticks = svgEl('g');
                 ticks.setAttribute('data-layer', 'ticks');
-                chartSvg.appendChild(ticks);
+                chartRoot.appendChild(ticks);
 
                 const zodiac = svgEl('g');
                 zodiac.setAttribute('data-layer', 'zodiac');
-                chartSvg.appendChild(zodiac);
+                chartRoot.appendChild(zodiac);
 
                 const houses = svgEl('g');
                 houses.setAttribute('data-layer', 'houses');
-                chartSvg.appendChild(houses);
+                chartRoot.appendChild(houses);
 
                 const aspects = svgEl('g');
                 aspects.setAttribute('data-layer', 'aspects');
-                chartSvg.appendChild(aspects);
+                chartRoot.appendChild(aspects);
 
                 const planets = svgEl('g');
                 planets.setAttribute('data-layer', 'planets');
-                chartSvg.appendChild(planets);
+                chartRoot.appendChild(planets);
 
                 // címkék (mindig legfelül): házszámok, fényszög jelölések
                 const labels = svgEl('g');
                 labels.setAttribute('data-layer', 'labels');
                 labels.setAttribute('style', 'pointer-events: none;');
-                chartSvg.appendChild(labels);
+                chartRoot.appendChild(labels);
             }
 
             function getLayer(name) {
-                return chartSvg.querySelector(`g[data-layer="${name}"]`);
+                return chartRoot.querySelector(`g[data-layer="${name}"]`);
+            }
+
+            function elevateLayer(name) {
+                const layer = getLayer(name);
+                if (!layer?.parentNode) {
+                    return;
+                }
+                const labels = getLayer('labels');
+                if (labels) {
+                    layer.parentNode.insertBefore(layer, labels);
+                    return;
+                }
+                layer.parentNode.appendChild(layer);
             }
 
             function decanColor(meta, decanIndex) {
@@ -1243,13 +1462,14 @@
                 }
             }
 
-            function drawInnerPlanetMarkers(planets, rotationDeg) {
+            function drawInnerPlanetMarkers(planets, rotationDeg, palette = 'default', aspectedNames = null) {
                 // Bolygó-helyzet jelölő vonalak a legbelső gyűrűben
                 const layer = getLayer('ticks');
                 if (!layer) return;
 
                 planets.forEach((p) => {
-                    const style = getPlanetStyle(p.name);
+                    const style = getPlanetStyle(p.name, palette);
+                    const opacity = planetDisplayOpacity(p.name, aspectedNames);
                     const angle = p.longitude + rotationDeg;
                     const a = polarToCartesian(angle, CHART.rInner + 1);
                     const b = polarToCartesian(angle, CHART.rAspect - 1);
@@ -1260,16 +1480,17 @@
                     line.setAttribute('y2', b.y);
                     line.setAttribute('stroke', style.fg);
                     line.setAttribute('stroke-width', '1.4');
-                    line.setAttribute('opacity', '0.95');
+                    line.setAttribute('opacity', String(0.95 * opacity));
                     layer.appendChild(line);
                 });
             }
 
-            function drawPlanetMarkers(planets, rotationDeg) {
+            function drawPlanetMarkers(planets, rotationDeg, palette = 'default', aspectedNames = null) {
                 const layer = getLayer('ticks');
                 if (!layer) return;
                 planets.forEach((p) => {
-                    const style = getPlanetStyle(p.name);
+                    const style = getPlanetStyle(p.name, palette);
+                    const opacity = planetDisplayOpacity(p.name, aspectedNames);
                     const angle = p.longitude + rotationDeg;
                     const a = polarToCartesian(angle, CHART.rZodiacInner + 1);
                     const b = polarToCartesian(angle, CHART.rZodiacOuter - 1);
@@ -1280,7 +1501,7 @@
                     line.setAttribute('y2', b.y);
                     line.setAttribute('stroke', style.fg);
                     line.setAttribute('stroke-width', '1.1');
-                    line.setAttribute('opacity', '0.9');
+                    line.setAttribute('opacity', String(0.9 * opacity));
                     layer.appendChild(line);
 
                     // plusz jelölés a zodiákus külső fokbeosztásán (kis tick)
@@ -1293,33 +1514,66 @@
                     tick.setAttribute('y2', t2.y);
                     tick.setAttribute('stroke', style.fg);
                     tick.setAttribute('stroke-width', '1.4');
-                    tick.setAttribute('opacity', '0.95');
+                    tick.setAttribute('opacity', String(0.95 * opacity));
                     layer.appendChild(tick);
                 });
             }
 
-            function drawHousesFromCusps(cusps, rotationDeg) {
+            function normalizeHouseCusps(cusps) {
+                if (!cusps) {
+                    return [];
+                }
+                if (Array.isArray(cusps)) {
+                    return cusps.slice(0, 12).map((value) => Number(value));
+                }
+                if (typeof cusps === 'object') {
+                    const list = [];
+                    for (let i = 0; i < 12; i++) {
+                        const raw = cusps[i] ?? cusps[String(i)] ?? cusps[i + 1] ?? cusps[String(i + 1)];
+                        list.push(Number(raw));
+                    }
+                    return list;
+                }
+                return [];
+            }
+
+            function drawHousesFromCusps(cusps, rotationDeg, options = {}) {
                 const layer = getLayer('houses');
                 if (!layer) return;
+
+                const list = normalizeHouseCusps(cusps);
+                if (list.length < 12 || list.some((value) => !Number.isFinite(value))) {
+                    return;
+                }
+
+                const color = options.color ?? '#dc3545';
+                const opacityScale = options.opacityScale ?? 1;
+                const dash = options.dash ?? null;
+                const rInner = options.rInner ?? CHART.rInner;
+                const rOuter = options.rOuter ?? CHART.rZodiacInner;
 
                 // 1/4/7/10 tengelyek (ASC/IC/DSC/MC)
                 const axisIndices = new Set([0, 3, 6, 9]);
 
-                cusps.forEach((rawAngle, idx) => {
-                    const angle = normalizeAngle(rawAngle + rotationDeg);
-                    const outer = polarToCartesian(angle, CHART.rHouseOuter);
-                    const inner = polarToCartesian(angle, CHART.rHouseInner);
+                for (let idx = 0; idx < 12; idx++) {
+                    const angle = normalizeAngle(list[idx] + rotationDeg);
+                    const outer = polarToCartesian(angle, rOuter);
+                    const inner = polarToCartesian(angle, rInner);
 
                     const line = svgEl('line');
                     line.setAttribute('x1', inner.x);
                     line.setAttribute('y1', inner.y);
                     line.setAttribute('x2', outer.x);
                     line.setAttribute('y2', outer.y);
-                    line.setAttribute('stroke', '#dc3545');
-                    line.setAttribute('opacity', axisIndices.has(idx) ? '0.95' : '0.55');
-                    line.setAttribute('stroke-width', axisIndices.has(idx) ? '2.4' : '1.4');
+                    line.setAttribute('stroke', color);
+                    line.setAttribute('opacity', String((axisIndices.has(idx) ? 0.95 : 0.7) * opacityScale));
+                    line.setAttribute('stroke-width', axisIndices.has(idx) ? '2.6' : '1.6');
+                    line.setAttribute('stroke-linecap', 'round');
+                    if (dash) {
+                        line.setAttribute('stroke-dasharray', dash);
+                    }
                     layer.appendChild(line);
-                });
+                }
             }
 
             function angleMid(a, b) {
@@ -1328,23 +1582,28 @@
                 return (a + diff / 2) % 360;
             }
 
-            function drawHouseNumbersFromCusps(cusps, rotationDeg) {
+            function drawHouseNumbersFromCusps(cusps, rotationDeg, options = {}) {
                 const layer = getLayer('labels');
                 if (!layer) return;
+
+                const list = normalizeHouseCusps(cusps);
+                if (list.length < 12 || list.some((value) => !Number.isFinite(value))) {
+                    return;
+                }
+
+                const color = options.color ?? '#dc3545';
+                const radius = options.radius ?? (CHART.rHouseOuter + CHART.rHouseInner) / 2;
                 for (let i = 0; i < 12; i++) {
-                    const mid = angleMid(cusps[i], cusps[(i + 1) % 12]);
-                    // a ház-gyűrűben legyen (ne a zodiákus gyűrűben)
-                    const r = (CHART.rHouseOuter + CHART.rHouseInner) / 2;
-                    const point = polarToCartesian(normalizeAngle(mid + rotationDeg), r);
+                    const mid = angleMid(list[i], list[(i + 1) % 12]);
+                    const point = polarToCartesian(normalizeAngle(mid + rotationDeg), radius);
 
                     const label = svgEl('text');
                     label.setAttribute('x', point.x);
                     label.setAttribute('y', point.y);
                     label.setAttribute('text-anchor', 'middle');
                     label.setAttribute('dominant-baseline', 'middle');
-                    // 50%-kal kisebb
                     label.setAttribute('font-size', '6');
-                    label.setAttribute('fill', '#dc3545');
+                    label.setAttribute('fill', color);
                     label.setAttribute('font-weight', '600');
                     label.textContent = String(i + 1);
                     layer.appendChild(label);
@@ -1378,6 +1637,45 @@
             function aspectOrbis(p1, p2) {
                 const isLuminary = (p) => p.name === 'Sun' || p.name === 'Moon';
                 return isLuminary(p1) || isLuminary(p2) ? 3 : 2;
+            }
+
+            function calcCrossAspects(planetsA, planetsB) {
+                const aspects = [];
+                for (const p1 of planetsA) {
+                    for (const p2 of planetsB) {
+                        const diff = smallestAngleDiff(p1.longitude, p2.longitude);
+                        const orbis = aspectOrbis(p1, p2);
+                        for (const def of aspectDefs) {
+                            const delta = Math.abs(diff - def.angle);
+                            if (delta <= orbis) {
+                                aspects.push({ p1, p2, def, orb: delta });
+                                break;
+                            }
+                        }
+                    }
+                }
+                return aspects;
+            }
+
+            function drawCrossAspects(planetsA, planetsB, radius, strokeOpacity, rotationDeg) {
+                const layer = getLayer('aspects');
+                if (!layer) return;
+                const aspects = calcCrossAspects(planetsA, planetsB);
+                aspects.forEach(({ p1, p2, def }) => {
+                    const a = polarToCartesian(normalizeAngle(p1.longitude + rotationDeg), radius);
+                    const b = polarToCartesian(normalizeAngle(p2.longitude + rotationDeg), radius);
+                    const line = svgEl('line');
+                    line.setAttribute('x1', a.x);
+                    line.setAttribute('y1', a.y);
+                    line.setAttribute('x2', b.x);
+                    line.setAttribute('y2', b.y);
+                    line.setAttribute('stroke', def.color);
+                    line.setAttribute('stroke-width', '2.2');
+                    line.setAttribute('opacity', String(strokeOpacity));
+                    layer.appendChild(line);
+
+                    drawAspectMark(def, a, b);
+                });
             }
 
             function calcAspects(planets) {
@@ -1437,7 +1735,7 @@
                 'True Node': '☊',
             };
 
-            function getPlanetStyle(name) {
+            function getPlanetStyle(name, palette = 'default') {
                 const base = {
                     symbol: planetSymbols[name] ?? '?',
                     fg: '#111',
@@ -1447,6 +1745,13 @@
                     ringStroke: '#111',
                     ringStrokeWidth: 1,
                 };
+
+                if (palette === 'blue') {
+                    return { ...base, fg: '#ffffff', bg: DUAL_BLUE, ringStroke: '#1e40af', r: 15, fontSize: 18 };
+                }
+                if (palette === 'red') {
+                    return { ...base, fg: '#ffffff', bg: DUAL_RED, ringStroke: '#991b1b', r: 15, fontSize: 18 };
+                }
 
                 switch (name) {
                     case 'Sun':
@@ -1497,6 +1802,10 @@
                 t.textContent = style.symbol;
                 g.appendChild(t);
 
+                if (style.opacity !== undefined && style.opacity < 1) {
+                    g.setAttribute('opacity', String(style.opacity));
+                }
+
                 layer.appendChild(g);
 
                 // kattintás: bolygó neve
@@ -1504,9 +1813,13 @@
                 g.addEventListener('click', () => showSelection(tr('planet_selection', { name: planetLabel(name) })));
             }
 
-            function drawPlanets(planets, rotationDeg) {
+            function drawPlanets(planets, rotationDeg, options = {}) {
                 const layer = getLayer('planets');
                 if (!layer) return;
+
+                const palette = options.palette ?? 'default';
+                const radiusOffset = options.radiusOffset ?? 0;
+                const aspectedNames = options.aspectedNames ?? null;
 
                 // kis ütközéskezelés: ha nagyon közel vannak egymáshoz, lépcsőzzük a sugarat
                 const sorted = planets
@@ -1516,7 +1829,8 @@
                 let lastAngle = null;
                 let level = 0;
                 sorted.forEach((planet) => {
-                    const style = getPlanetStyle(planet.name);
+                    const style = getPlanetStyle(planet.name, palette);
+                    const opacity = planetDisplayOpacity(planet.name, aspectedNames);
                     const angle = normalizeAngle(planet.longitude + rotationDeg);
                     if (lastAngle !== null && smallestAngleDiff(angle, lastAngle) < 8) {
                         level = (level + 1) % 3;
@@ -1525,7 +1839,7 @@
                     }
                     lastAngle = angle;
 
-                    const radius = CHART.rPlanetBase + level * CHART.rPlanetStep;
+                    const radius = CHART.rPlanetBase + radiusOffset + level * CHART.rPlanetStep;
                     const point = polarToCartesian(angle, radius);
 
                     // kis jelölő pötty
@@ -1534,13 +1848,201 @@
                     dot.setAttribute('cy', point.y);
                     dot.setAttribute('r', '2.5');
                     dot.setAttribute('fill', style.fg);
+                    dot.setAttribute('opacity', String(opacity));
                     layer.appendChild(dot);
 
-                    drawPlanetGlyph(planet.name, point.x, point.y, style);
+                    drawPlanetGlyph(planet.name, point.x, point.y, { ...style, opacity });
                 });
             }
 
+            function getDualInputs(side) {
+                return side === 'a'
+                    ? { date: dualADate, time: dualATime, meta: dualChartMeta.a }
+                    : { date: dualBDate, time: dualBTime, meta: dualChartMeta.b };
+            }
+
+            function applyDualBirthChart(side, chartId) {
+                const chart = getBirthChartById(chartId);
+                if (!chart?.datetime_utc) {
+                    return false;
+                }
+
+                const { date, time, meta } = getDualInputs(side);
+                const offset = Number(chart.offset ?? 2);
+                if (!Number.isFinite(offset)) {
+                    return false;
+                }
+
+                meta.offset = offset;
+                meta.lat = chart.lat !== null && chart.lat !== '' ? Number(chart.lat) : null;
+                meta.lon = chart.lon !== null && chart.lon !== '' ? Number(chart.lon) : null;
+
+                const utcMs = Date.parse(String(chart.datetime_utc));
+                if (!Number.isFinite(utcMs)) {
+                    return false;
+                }
+
+                const local = utcMsToLocalInputs(utcMs, offset);
+                date.value = local.date;
+                time.value = local.time;
+                return true;
+            }
+
+            function applyDualNow(side) {
+                const { date, time, meta } = getDualInputs(side);
+                const lat = USER_LOC.current.lat ?? natalInputs.lat.value;
+                const lon = USER_LOC.current.lon ?? natalInputs.lon.value;
+                meta.lat = lat !== null && lat !== '' ? Number(lat) : null;
+                meta.lon = lon !== null && lon !== '' ? Number(lon) : null;
+                meta.offset = Number(USER_LOC.current.offset ?? natalInputs.offset.value ?? 2);
+                const local = utcMsToLocalInputs(Date.now(), meta.offset);
+                date.value = local.date;
+                time.value = local.time;
+            }
+
+            function validateDualSide(side) {
+                const { date, time, meta } = getDualInputs(side);
+                if (!date?.value || !time?.value) {
+                    return tr('err_date_time');
+                }
+                if (meta.lat === null || meta.lon === null || !Number.isFinite(meta.lat) || !Number.isFinite(meta.lon)) {
+                    return tr('err_coordinates');
+                }
+                if (!Number.isFinite(meta.offset)) {
+                    return tr('err_timezone');
+                }
+                return '';
+            }
+
+            function buildDualPayload() {
+                const a = getDualInputs('a');
+                const b = getDualInputs('b');
+
+                return {
+                    natal: {
+                        datetime_utc: toUtcIso(a.date.value, a.time.value, a.meta.offset),
+                        lat: a.meta.lat,
+                        lon: a.meta.lon,
+                    },
+                    transit: {
+                        datetime_utc: toUtcIso(b.date.value, b.time.value, b.meta.offset),
+                        lat: b.meta.lat,
+                        lon: b.meta.lon,
+                    },
+                    sidereal: zodiacModeSelect.value === 'sidereal',
+                    ayanamsa: 'lahiri',
+                    house_system: houseSystemSelect.value,
+                };
+            }
+
+            function renderDualChart(data) {
+                chartRoot = dualChartSvg;
+                const rotationDeg = normalizeAngle(270 - data.natal.asc);
+                const crossAspects = calcCrossAspects(data.natal.planets, data.transit.planets);
+                const aspectedBlue = new Set(crossAspects.map(({ p1 }) => p1.name));
+                const aspectedRed = new Set(crossAspects.map(({ p2 }) => p2.name));
+
+                clearChart();
+                drawZodiacRing(rotationDeg);
+                drawPlanetMarkers(data.natal.planets, rotationDeg, 'blue', aspectedBlue);
+                drawPlanetMarkers(data.transit.planets, rotationDeg, 'red', aspectedRed);
+                drawInnerRingTicks(rotationDeg);
+                drawInnerPlanetMarkers(data.natal.planets, rotationDeg, 'blue', aspectedBlue);
+                drawInnerPlanetMarkers(data.transit.planets, rotationDeg, 'red', aspectedRed);
+
+                drawCrossAspects(data.natal.planets, data.transit.planets, CHART.rAspect, 0.65, rotationDeg);
+                drawPlanets(data.natal.planets, rotationDeg, { palette: 'blue', radiusOffset: 5, aspectedNames: aspectedBlue });
+                drawPlanets(data.transit.planets, rotationDeg, { palette: 'red', radiusOffset: -7, aspectedNames: aspectedRed });
+
+                drawHousesFromCusps(data.natal.houses, rotationDeg, { color: DUAL_BLUE });
+                drawHousesFromCusps(data.transit.houses, rotationDeg, {
+                    color: DUAL_RED,
+                    opacityScale: 0.75,
+                    dash: '5 3',
+                });
+                drawHouseNumbersFromCusps(data.natal.houses, rotationDeg, { color: DUAL_BLUE });
+                drawHouseNumbersFromCusps(data.transit.houses, rotationDeg, {
+                    color: DUAL_RED,
+                    radius: CHART.rHouseInner + 8,
+                });
+                elevateLayer('houses');
+            }
+
+            async function calculateDual() {
+                chartRoot = dualChartSvg;
+                const seq = ++dualCalculateSeq;
+                errorBox.classList.add('hidden');
+
+                const errA = validateDualSide('a');
+                const errB = validateDualSide('b');
+                if (errA || errB) {
+                    if (seq !== dualCalculateSeq) return;
+                    errorBox.textContent = errA || errB;
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(calcUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(buildDualPayload()),
+                    });
+
+                    const data = await response.json();
+                    if (seq !== dualCalculateSeq) return;
+                    if (!response.ok) {
+                        const err = new Error(data.error || 'Ismeretlen hiba');
+                        err.details = data.details || '';
+                        throw err;
+                    }
+
+                    renderDualChart(data);
+                } catch (error) {
+                    if (seq !== dualCalculateSeq) return;
+                    console.error('Dual horoscope calculate failed:', error);
+                    const msg = error?.message || 'Ismeretlen hiba';
+                    const details = error?.details ? `\n\n${error.details}` : '';
+                    errorBox.textContent = `${msg}${details}`;
+                    errorBox.classList.remove('hidden');
+                }
+            }
+
+            async function bootDualChart() {
+                if (!dualBooted) {
+                    dualBooted = true;
+                    const defaultChart = BIRTH_CHARTS.find((chart) => chart.is_default) ?? BIRTH_CHARTS[0];
+                    if (defaultChart) {
+                        if (dualBirthChartSelectA) {
+                            dualBirthChartSelectA.value = String(defaultChart.id);
+                        }
+                        applyDualBirthChart('a', defaultChart.id);
+                    }
+                    applyDualNow('b');
+                    if (dualBirthChartSelectB) {
+                        dualBirthChartSelectB.value = 'now';
+                    }
+                    updateDualNowSteppingVisibility();
+                }
+                await calculateDual();
+            }
+
+            function applyDualSelect(side, value) {
+                if (!value) {
+                    return false;
+                }
+                if (value === 'now') {
+                    applyDualNow(side);
+                    return true;
+                }
+                return applyDualBirthChart(side, value);
+            }
+
             async function calculate() {
+                chartRoot = chartSvg;
                 const seq = ++calculateSeq;
                 errorBox.classList.add('hidden');
                 const natalError = validateInputs(natalInputs);
@@ -1614,25 +2116,28 @@
 
                     // Klasszikus kerék forgatás: ASC balra (9 óránál)
                     const rotationDeg = normalizeAngle(270 - data.natal.asc);
+                    const natalAspects = calcAspects(data.natal.planets);
+                    const aspectedNames = buildAspectedNames(natalAspects);
 
                     clearChart();
                     drawZodiacRing(rotationDeg);
                     // bolygó jelölő vonalak a zodiákus gyűrűben
-                    drawPlanetMarkers(data.natal.planets, rotationDeg);
+                    drawPlanetMarkers(data.natal.planets, rotationDeg, 'default', aspectedNames);
 
                     // Legbelső gyűrű: fok+dekád beosztás + bolygó jelölő vonalak
                     drawInnerRingTicks(rotationDeg);
-                    drawInnerPlanetMarkers(data.natal.planets, rotationDeg);
-
-                    // Házak: a natal cuspok adják az alapot
-                    drawHousesFromCusps(data.natal.houses, rotationDeg);
-                    drawHouseNumbersFromCusps(data.natal.houses, rotationDeg);
+                    drawInnerPlanetMarkers(data.natal.planets, rotationDeg, 'default', aspectedNames);
 
                     // Aspektusok + bolygók: egyelőre csak natal a keréken
                     if (showNatalCheckbox.checked) {
                         drawAspects(data.natal.planets, CHART.rAspect, 0.55, rotationDeg);
-                        drawPlanets(data.natal.planets, rotationDeg);
+                        drawPlanets(data.natal.planets, rotationDeg, { aspectedNames });
                     }
+
+                    // Házak: a natal cuspok adják az alapot (a bolygók után, hogy a vonalak látszódjanak)
+                    drawHousesFromCusps(data.natal.houses, rotationDeg);
+                    drawHouseNumbersFromCusps(data.natal.houses, rotationDeg);
+                    elevateLayer('houses');
 
                     lastHoroscopeData = data;
                 } catch (error) {
@@ -1706,7 +2211,7 @@
                 days: 86400,
             };
 
-            document.querySelectorAll('[data-shift-unit]').forEach((btn) => {
+            document.querySelectorAll('[data-shift-unit]:not([data-dual-shift-side])').forEach((btn) => {
                 btn.addEventListener('click', () => {
                     const unit = btn.getAttribute('data-shift-unit');
                     const dir = Number(btn.getAttribute('data-shift-dir'));
@@ -1722,6 +2227,40 @@
                 });
             });
 
+            const dualShiftValueInputs = {
+                a: {
+                    minutes: document.getElementById('dualShiftAMinutes'),
+                    hours: document.getElementById('dualShiftAHours'),
+                    days: document.getElementById('dualShiftADays'),
+                    months: document.getElementById('dualShiftAMonths'),
+                },
+                b: {
+                    minutes: document.getElementById('dualShiftBMinutes'),
+                    hours: document.getElementById('dualShiftBHours'),
+                    days: document.getElementById('dualShiftBDays'),
+                    months: document.getElementById('dualShiftBMonths'),
+                },
+            };
+
+            document.querySelectorAll('[data-dual-shift-side]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const side = btn.getAttribute('data-dual-shift-side');
+                    const unit = btn.getAttribute('data-shift-unit');
+                    const dir = Number(btn.getAttribute('data-shift-dir'));
+                    if (!side || !unit || !Number.isFinite(dir) || (dir !== 1 && dir !== -1)) return;
+                    const sideInputs = dualShiftValueInputs[side];
+                    if (!sideInputs) return;
+                    const amount = readPositiveInt(sideInputs[unit], 1);
+
+                    if (unit === 'months') {
+                        shiftDualTimeByMonths(side, dir * amount);
+                        return;
+                    }
+                    if (!(unit in unitSeconds)) return;
+                    shiftDualTimeBySeconds(side, dir * amount * unitSeconds[unit]);
+                });
+            });
+
             setNowBtn?.addEventListener('click', () => {
                 if (birthChartSelect) {
                     birthChartSelect.value = '';
@@ -1729,6 +2268,26 @@
                 if (applyPreset('current')) {
                     calculate();
                 }
+            });
+
+            document.getElementById('resetNowStepping')?.addEventListener('click', () => {
+                if (birthChartSelect) {
+                    birthChartSelect.value = '';
+                }
+                if (applyPreset('current')) {
+                    calculate();
+                }
+            });
+
+            document.querySelectorAll('[data-dual-reset-now]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const side = btn.getAttribute('data-dual-reset-now');
+                    if (!side) {
+                        return;
+                    }
+                    applyDualNow(side);
+                    calculateDual();
+                });
             });
 
             birthChartSelect?.addEventListener('change', () => {
@@ -1743,7 +2302,32 @@
             // Tab kezelés
             tabChart.addEventListener('click', () => setActiveTab('chart'));
             tabTables.addEventListener('click', () => setActiveTab('tables'));
+            tabDual.addEventListener('click', () => setActiveTab('dual'));
             setActiveTab('chart');
+
+            dualBirthChartSelectA?.addEventListener('change', () => {
+                updateDualNowSteppingVisibility();
+                if (!dualBirthChartSelectA.value) {
+                    return;
+                }
+                if (applyDualSelect('a', dualBirthChartSelectA.value)) {
+                    calculateDual();
+                }
+            });
+
+            dualBirthChartSelectB?.addEventListener('change', () => {
+                updateDualNowSteppingVisibility();
+                if (!dualBirthChartSelectB.value) {
+                    return;
+                }
+                if (applyDualSelect('b', dualBirthChartSelectB.value)) {
+                    calculateDual();
+                }
+            });
+
+            [dualADate, dualATime, dualBDate, dualBTime].forEach((el) => {
+                el?.addEventListener('change', calculateDual);
+            });
 
             // Egyszerűsített chat az ábra alatt
             const horoscopeChatQuestion = document.getElementById('horoscopeChatQuestion');
