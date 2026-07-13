@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BirthChartRequest;
 use App\Models\BirthChart;
+use App\Services\AstrologyChartScoringService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -41,7 +42,8 @@ class ProfileBirthChartController extends Controller
             $data['is_default'] = true;
         }
 
-        $user->birthCharts()->create($data);
+        $chart = $user->birthCharts()->create($data);
+        $this->scoreBirthChartSafely($chart);
 
         return Redirect::route('profile.birth-charts.index')->with('status', 'birth-chart-created');
     }
@@ -69,6 +71,7 @@ class ProfileBirthChartController extends Controller
         }
 
         $birthChart->update($data);
+        $this->scoreBirthChartSafely($birthChart);
 
         return Redirect::route('profile.birth-charts.index')->with('status', 'birth-chart-updated');
     }
@@ -137,5 +140,14 @@ class ProfileBirthChartController extends Controller
     private function authorizeChart(Request $request, BirthChart $birthChart): void
     {
         abort_if($birthChart->user_id !== $request->user()->id, 403);
+    }
+
+    private function scoreBirthChartSafely(BirthChart $birthChart): void
+    {
+        try {
+            app(AstrologyChartScoringService::class)->scoreBirthChart($birthChart);
+        } catch (\Throwable) {
+            // A mentés sikeres marad; az értékelés később újraszámolható.
+        }
     }
 }

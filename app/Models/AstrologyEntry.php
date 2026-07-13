@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class AstrologyEntry extends Model
+{
+    protected $fillable = [
+        'type',
+        'key',
+        'locale',
+        'title',
+        'question',
+        'answer',
+        'created_by_user_id',
+    ];
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+}

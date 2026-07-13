@@ -13,7 +13,9 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm rounded-lg">
                 <div class="p-6">
-                    <div class="relative flex flex-wrap gap-2 border-b pb-3 items-center" x-data="{ menuOpen: false }">
+                    @include('partials.app-icon-toolbar')
+
+                    <div class="flex flex-wrap gap-2 mt-2">
                         <button
                             type="button"
                             class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
@@ -56,23 +58,10 @@
                                 <path d="M15.5 6.5v11M9.5 12h12" opacity="0.85" />
                             </svg>
                         </button>
-                        @include('partials.locale-select')
-                        <button
-                            type="button"
-                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
-                            @click="menuOpen = !menuOpen"
-                            :aria-expanded="menuOpen"
-                            aria-label="{{ __('app.menu') }}"
-                        >
-                            <svg class="h-5 w-5" stroke="currentColor" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                <path :class="{'hidden': menuOpen, 'inline-flex': !menuOpen}" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                                <path :class="{'hidden': !menuOpen, 'inline-flex': menuOpen}" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        @include('partials.horoscope-nav-menu')
                     </div>
 
                     <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>
+                    <div id="selectionBox" class="hidden mt-3 max-w-xl mx-auto text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2"></div>
 
                     <div class="mt-4" id="panelChart">
                         <div class="max-w-xl mx-auto flex items-center justify-between gap-3 mb-3">
@@ -124,7 +113,6 @@
 
                         <div class="max-w-xl mx-auto" id="chartShell">
                             <svg class="w-full h-auto" viewBox="0 0 400 400" role="img" aria-label="{{ __('horoscope.chart_aria') }}" id="chartSvg"></svg>
-                            <div id="selectionBox" class="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2 hidden"></div>
                         </div>
 
                         <div class="mt-4 max-w-xl mx-auto space-y-2" id="horoscopeChat">
@@ -417,6 +405,23 @@
         </div>
     </div>
 
+    <div id="elementInfoModal" class="hidden fixed inset-0 z-50 overflow-y-auto px-4 py-8" role="dialog" aria-modal="true" aria-labelledby="elementInfoTitle">
+        <div id="elementInfoBackdrop" class="fixed inset-0 bg-gray-900/50"></div>
+        <div class="relative max-w-lg mx-auto bg-white rounded-lg shadow-xl border border-gray-200">
+            <div class="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-200">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900" id="elementInfoTitle"></h3>
+                    <p class="text-xs text-gray-500 mt-1 hidden" id="elementInfoHint"></p>
+                </div>
+                <button type="button" id="elementInfoClose" class="text-gray-500 hover:text-gray-800 text-xl leading-none" aria-label="{{ __('horoscope.js.element_info_close') }}">×</button>
+            </div>
+            <div class="px-5 py-4">
+                <p class="text-sm text-gray-700 whitespace-pre-wrap" id="elementInfoBody"></p>
+                <p class="hidden text-sm text-red-600 mt-2" id="elementInfoError"></p>
+            </div>
+        </div>
+    </div>
+
     <style>
         [x-cloak] {
             display: none !important;
@@ -458,12 +463,17 @@
                 return horoscopeI18n.planets?.[name] || name;
             }
 
+            function fixedStarLabel(name) {
+                return horoscopeI18n.fixed_stars?.[name] || name;
+            }
+
             const signNames = horoscopeI18n.signs;
 
             // Relatív URL-ek: így mindegy, hogy localhost vagy 127.0.0.1 alatt nyitod meg az oldalt,
             // a fetch mindig ugyanarra az originre megy (nem lesz CORS / "Failed to fetch").
             const geocodeUrl = '{{ route('horoscope.geocode', [], false) }}';
             const calcUrl = '{{ route('horoscope.calculate', [], false) }}';
+            const elementInfoUrl = '{{ route('horoscope.info', [], false) }}';
             const horoscopeChatUrl = '{{ route('horoscope.chat', [], false) }}';
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
             let lastHoroscopeData = null;
@@ -666,6 +676,8 @@
             const DUAL_BLUE = '#2563eb';
             const DUAL_RED = '#dc2626';
             const UNASPECTED_PLANET_OPACITY = 0.32;
+            const FIXED_STAR_CONJ_ORB = 2.0;
+            const DEFAULT_FIXED_STAR_SYMBOL = '✦';
 
             function buildAspectedNames(aspects) {
                 const names = new Set();
@@ -697,6 +709,119 @@
                 if (!selectionBox) return;
                 selectionBox.textContent = text;
                 selectionBox.classList.remove('hidden');
+                selectionBox.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+
+            const elementInfoModal = document.getElementById('elementInfoModal');
+            const elementInfoTitle = document.getElementById('elementInfoTitle');
+            const elementInfoBody = document.getElementById('elementInfoBody');
+            const elementInfoHint = document.getElementById('elementInfoHint');
+            const elementInfoError = document.getElementById('elementInfoError');
+            const elementInfoClose = document.getElementById('elementInfoClose');
+            const elementInfoBackdrop = document.getElementById('elementInfoBackdrop');
+            let elementInfoBusy = false;
+
+            function closeElementInfoModal() {
+                elementInfoModal?.classList.add('hidden');
+                document.body.classList.remove('overflow-y-hidden');
+            }
+
+            function openElementInfoModal(title, body, hint = '') {
+                if (!elementInfoModal) return;
+                if (elementInfoTitle) elementInfoTitle.textContent = title;
+                if (elementInfoBody) elementInfoBody.textContent = body;
+                if (elementInfoHint) {
+                    elementInfoHint.textContent = hint;
+                    elementInfoHint.classList.toggle('hidden', !hint);
+                }
+                if (elementInfoError) {
+                    elementInfoError.textContent = '';
+                    elementInfoError.classList.add('hidden');
+                }
+                elementInfoModal.classList.remove('hidden');
+                document.body.classList.add('overflow-y-hidden');
+            }
+
+            function showElementInfoError(message) {
+                if (elementInfoError) {
+                    elementInfoError.textContent = message;
+                    elementInfoError.classList.remove('hidden');
+                }
+                if (elementInfoBody) elementInfoBody.textContent = '';
+            }
+
+            async function openElementInfoPopup({ type, key, title }) {
+                if (elementInfoBusy || !type || !key) {
+                    return;
+                }
+
+                elementInfoBusy = true;
+                openElementInfoModal(title || key, tr('element_info_loading'));
+
+                try {
+                    const response = await fetch(elementInfoUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify({
+                            type,
+                            key,
+                            title: title || key,
+                        }),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.error || tr('element_info_error'));
+                    }
+
+                    const hint = data.cached ? tr('element_info_cached_hint') : tr('element_info_new_hint');
+                    openElementInfoModal(data.title || title || key, data.answer || '', hint);
+                } catch (error) {
+                    console.error('Element info failed:', error);
+                    openElementInfoModal(title || key, '');
+                    showElementInfoError(error?.message || tr('element_info_error'));
+                } finally {
+                    elementInfoBusy = false;
+                }
+            }
+
+            elementInfoClose?.addEventListener('click', closeElementInfoModal);
+            elementInfoBackdrop?.addEventListener('click', closeElementInfoModal);
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && elementInfoModal && !elementInfoModal.classList.contains('hidden')) {
+                    closeElementInfoModal();
+                }
+            });
+
+            function clearFixedStarNameLabels() {
+                chartRoot?.querySelectorAll('[data-fixed-star-label]').forEach((el) => el.remove());
+            }
+
+            function showFixedStarNameLabel(starName, angle, radius, isConjunct = false) {
+                const layer = getLayer('labels');
+                if (!layer) return;
+
+                clearFixedStarNameLabels();
+
+                const point = polarToCartesian(angle, radius + 13);
+                const label = svgEl('text');
+                label.setAttribute('data-fixed-star-label', starName);
+                label.setAttribute('x', point.x);
+                label.setAttribute('y', point.y);
+                label.setAttribute('text-anchor', 'middle');
+                label.setAttribute('dominant-baseline', 'middle');
+                label.setAttribute('font-size', '8');
+                label.setAttribute('font-weight', '700');
+                label.setAttribute('fill', isConjunct ? '#dc2626' : '#92400e');
+                label.setAttribute('stroke', '#fff');
+                label.setAttribute('stroke-width', '2');
+                label.setAttribute('paint-order', 'stroke');
+                label.setAttribute('style', 'pointer-events: none;');
+                label.textContent = fixedStarLabel(starName);
+                layer.appendChild(label);
             }
 
             const planetsOrder = [
@@ -1048,6 +1173,10 @@
                 rZodiacOuter: 168,
                 rZodiacInner: 140,
 
+                // Fix csillagok (a zodiákuson kívül)
+                rFixedStar: 181,
+                rFixedStarOuter: 188,
+
                 // Ház gyűrű
                 rHouseOuter: 140,
                 // +20% vastagság (eredetileg 35px volt: 140-105). 35 * 1.2 = 42.
@@ -1110,6 +1239,15 @@
                 zodiacOuter.setAttribute('stroke-width', '2');
                 chartRoot.appendChild(zodiacOuter);
 
+                const fixedStarOuter = svgEl('circle');
+                fixedStarOuter.setAttribute('cx', CHART.cx);
+                fixedStarOuter.setAttribute('cy', CHART.cy);
+                fixedStarOuter.setAttribute('r', CHART.rFixedStarOuter);
+                fixedStarOuter.setAttribute('fill', 'none');
+                fixedStarOuter.setAttribute('stroke', '#cbd5e1');
+                fixedStarOuter.setAttribute('stroke-width', '1');
+                chartRoot.appendChild(fixedStarOuter);
+
                 const zodiacInner = svgEl('circle');
                 zodiacInner.setAttribute('cx', CHART.cx);
                 zodiacInner.setAttribute('cy', CHART.cy);
@@ -1157,6 +1295,11 @@
                 const planets = svgEl('g');
                 planets.setAttribute('data-layer', 'planets');
                 chartRoot.appendChild(planets);
+
+                const fixedStars = svgEl('g');
+                fixedStars.setAttribute('data-layer', 'fixedStars');
+                fixedStars.setAttribute('style', 'pointer-events: all;');
+                chartRoot.appendChild(fixedStars);
 
                 // címkék (mindig legfelül): házszámok, fényszög jelölések
                 const labels = svgEl('g');
@@ -1374,7 +1517,11 @@
                     label.setAttribute('fill', '#111827');
                     label.textContent = signSymbols[i];
                     label.style.cursor = 'pointer';
-                    label.addEventListener('click', () => showSelection(tr('sign_selection', { name: signNames[i] })));
+                    label.addEventListener('click', () => openElementInfoPopup({
+                        type: 'sign',
+                        key: signMeta[i].name,
+                        title: signNames[i],
+                    }));
                     layer.appendChild(label);
                 }
             }
@@ -1810,7 +1957,11 @@
 
                 // kattintás: bolygó neve
                 g.style.cursor = 'pointer';
-                g.addEventListener('click', () => showSelection(tr('planet_selection', { name: planetLabel(name) })));
+                g.addEventListener('click', () => openElementInfoPopup({
+                    type: 'planet',
+                    key: name,
+                    title: planetLabel(name),
+                }));
             }
 
             function drawPlanets(planets, rotationDeg, options = {}) {
@@ -1852,6 +2003,116 @@
                     layer.appendChild(dot);
 
                     drawPlanetGlyph(planet.name, point.x, point.y, { ...style, opacity });
+                });
+            }
+
+            function findFixedStarConjunct(starLongitude, planetGroups) {
+                let best = null;
+
+                planetGroups.forEach(({ planets }) => {
+                    (planets || []).forEach((planet) => {
+                        const orb = smallestAngleDiff(starLongitude, planet.longitude);
+                        if (orb > FIXED_STAR_CONJ_ORB) {
+                            return;
+                        }
+                        if (!best || orb < best.orb) {
+                            best = { planet: planet.name, orb };
+                        }
+                    });
+                });
+
+                return best;
+            }
+
+            function drawFixedStars(stars, planetGroups, rotationDeg) {
+                const layer = getLayer('fixedStars');
+                if (!layer || !Array.isArray(stars) || stars.length === 0) {
+                    return;
+                }
+
+                const sorted = stars
+                    .slice()
+                    .sort((a, b) => normalizeAngle(a.longitude + rotationDeg) - normalizeAngle(b.longitude + rotationDeg));
+
+                let lastAngle = null;
+                let level = 0;
+
+                sorted.forEach((star) => {
+                    const conjunct = findFixedStarConjunct(star.longitude, planetGroups);
+                    const isConjunct = Boolean(conjunct);
+                    const angle = normalizeAngle(star.longitude + rotationDeg);
+
+                    if (lastAngle !== null && smallestAngleDiff(angle, lastAngle) < 6) {
+                        level = (level + 1) % 2;
+                    } else {
+                        level = 0;
+                    }
+                    lastAngle = angle;
+
+                    const radius = CHART.rFixedStar + level * 7;
+                    const tickOuter = polarToCartesian(angle, CHART.rZodiacOuter);
+                    const tickInner = polarToCartesian(angle, radius + (isConjunct ? 8 : 6));
+                    const tick = svgEl('line');
+                    tick.setAttribute('x1', tickOuter.x);
+                    tick.setAttribute('y1', tickOuter.y);
+                    tick.setAttribute('x2', tickInner.x);
+                    tick.setAttribute('y2', tickInner.y);
+                    tick.setAttribute('stroke', isConjunct ? '#dc2626' : '#94a3b8');
+                    tick.setAttribute('stroke-width', isConjunct ? '1.4' : '1');
+                    tick.setAttribute('opacity', isConjunct ? '0.95' : '0.75');
+                    layer.appendChild(tick);
+
+                    const point = polarToCartesian(angle, radius);
+                    const symbol = star.symbol || DEFAULT_FIXED_STAR_SYMBOL;
+                    const circleR = isConjunct ? 8.5 : 6;
+                    const fontSize = isConjunct ? 9 : 7;
+
+                    const g = svgEl('g');
+                    g.setAttribute('transform', `translate(${point.x} ${point.y})`);
+                    g.style.cursor = 'pointer';
+                    g.setAttribute('role', 'button');
+                    g.setAttribute('aria-label', fixedStarLabel(star.name));
+
+                    const hit = svgEl('circle');
+                    hit.setAttribute('cx', '0');
+                    hit.setAttribute('cy', '0');
+                    hit.setAttribute('r', '12');
+                    hit.setAttribute('fill', 'transparent');
+                    g.appendChild(hit);
+
+                    const ring = svgEl('circle');
+                    ring.setAttribute('cx', '0');
+                    ring.setAttribute('cy', '0');
+                    ring.setAttribute('r', String(circleR));
+                    ring.setAttribute('fill', isConjunct ? '#fee2e2' : '#fffbeb');
+                    ring.setAttribute('stroke', isConjunct ? '#dc2626' : '#b45309');
+                    ring.setAttribute('stroke-width', isConjunct ? '2' : '1.2');
+                    g.appendChild(ring);
+
+                    const t = svgEl('text');
+                    t.setAttribute('x', '0');
+                    t.setAttribute('y', '0');
+                    t.setAttribute('text-anchor', 'middle');
+                    t.setAttribute('dominant-baseline', 'middle');
+                    t.setAttribute('font-size', String(fontSize));
+                    t.setAttribute('font-family', '"Segoe UI Symbol", "Noto Sans Symbols2", "DejaVu Sans", sans-serif');
+                    t.setAttribute('fill', isConjunct ? '#dc2626' : '#92400e');
+                    t.setAttribute('font-weight', isConjunct ? '700' : '600');
+                    t.textContent = symbol;
+                    g.appendChild(t);
+
+                    g.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        const label = fixedStarLabel(star.name);
+                        showFixedStarNameLabel(star.name, angle, radius, isConjunct);
+                        openElementInfoPopup({
+                            type: 'fixed_star',
+                            key: star.name,
+                            title: label,
+                        });
+                    });
+
+                    layer.appendChild(g);
                 });
             }
 
@@ -1965,6 +2226,11 @@
                     color: DUAL_RED,
                     radius: CHART.rHouseInner + 8,
                 });
+                drawFixedStars(data.natal.fixed_stars || [], [
+                    { planets: data.natal.planets },
+                    { planets: data.transit.planets },
+                ], rotationDeg);
+                elevateLayer('fixedStars');
                 elevateLayer('houses');
             }
 
@@ -2082,6 +2348,7 @@
                         sidereal: zodiacModeSelect.value === 'sidereal',
                         ayanamsa: 'lahiri',
                         house_system: houseSystemSelect.value,
+                        birth_chart_id: birthChartSelect?.value ? Number(birthChartSelect.value) : null,
                     };
 
                     const response = await fetch(calcUrl, {
@@ -2137,6 +2404,8 @@
                     // Házak: a natal cuspok adják az alapot (a bolygók után, hogy a vonalak látszódjanak)
                     drawHousesFromCusps(data.natal.houses, rotationDeg);
                     drawHouseNumbersFromCusps(data.natal.houses, rotationDeg);
+                    drawFixedStars(data.natal.fixed_stars || [], [{ planets: data.natal.planets }], rotationDeg);
+                    elevateLayer('fixedStars');
                     elevateLayer('houses');
 
                     lastHoroscopeData = data;
@@ -2379,6 +2648,7 @@
                     const payload = {
                         prompt,
                         chart: lastHoroscopeData,
+                        birth_chart_id: birthChartSelect?.value ? Number(birthChartSelect.value) : null,
                     };
 
                     const response = await fetch(horoscopeChatUrl, {

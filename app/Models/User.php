@@ -39,6 +39,7 @@ class User extends Authenticatable
 
         'house_system',
         'zodiac_mode',
+        'scoring_profile_id',
 
         'tier',
         'is_admin',
@@ -94,5 +95,25 @@ class User extends Authenticatable
     public function chatThreads(): HasMany
     {
         return $this->hasMany(ChatThread::class);
+    }
+
+    public function natalCharts(): HasMany
+    {
+        return $this->hasMany(NatalChart::class);
+    }
+
+    public function scoringProfile(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ScoringProfile::class);
+    }
+
+    public function dailyHoroscopeSetting(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UserDailyHoroscopeSetting::class);
+    }
+
+    public function dailyHoroscopeMessages(): HasMany
+    {
+        return $this->hasMany(UserDailyHoroscopeMessage::class);
     }
 }

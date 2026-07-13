@@ -1,25 +1,24 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between gap-4">
-            <div>
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Admin · Felhasználó szerkesztése</h2>
-                <div class="text-sm text-gray-500">#{{ $user->id }} · {{ $user->email }}</div>
-            </div>
-
-            <a class="underline" href="{{ route('admin.users.index') }}">← vissza</a>
-        </div>
-    </x-slot>
-
-    <div class="py-6">
+    <div class="py-4">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white shadow-sm rounded-lg p-6 text-gray-900">
+                @include('partials.app-icon-toolbar')
+                @include('partials.admin-icon-toolbar')
+
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <div>
+                        <h2 class="text-lg font-medium text-gray-900">Felhasználó szerkesztése</h2>
+                        <div class="text-sm text-gray-500">#{{ $user->id }} · {{ $user->email }}</div>
+                    </div>
+                    <a class="underline text-sm text-gray-600" href="{{ route('admin.users.index') }}">← vissza</a>
+                </div>
+
             @if (session('status'))
                 <div class="mb-4 p-4 rounded bg-green-50 text-green-800 border border-green-200">
                     {{ session('status') }}
                 </div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
                     <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-4">
                         @csrf
                         @method('PUT')
@@ -57,7 +56,6 @@
                             <x-primary-button>Mentés</x-primary-button>
                         </div>
                     </form>
-                </div>
             </div>
         </div>
     </div>

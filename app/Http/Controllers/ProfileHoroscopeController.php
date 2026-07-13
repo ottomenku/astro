@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ScoringProfile;
 use App\Http\Requests\ProfileHoroscopeUpdateRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ class ProfileHoroscopeController extends Controller
     {
         return view('profile.horoscope', [
             'user' => $request->user(),
+            'scoringProfiles' => ScoringProfile::query()->orderBy('name')->get(),
         ]);
     }
 

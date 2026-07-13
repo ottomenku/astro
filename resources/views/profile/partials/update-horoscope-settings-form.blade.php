@@ -18,6 +18,19 @@
         </div>
 
         <div>
+            <x-input-label for="scoring_profile_id" :value="__('app.scoring_profile')" />
+            <select id="scoring_profile_id" name="scoring_profile_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                @foreach ($scoringProfiles as $profile)
+                    <option value="{{ $profile->id }}" @selected((int) old('scoring_profile_id', $user->scoring_profile_id ?? $scoringProfiles->firstWhere('is_default', true)?->id) === $profile->id)>
+                        {{ $profile->name }}
+                    </option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-gray-500">{{ __('app.scoring_profile_hint') }}</p>
+            <x-input-error :messages="$errors->get('scoring_profile_id')" class="mt-2" />
+        </div>
+
+        <div>
             <x-input-label for="zodiac_mode" :value="__('app.horoscope_type')" />
             <select id="zodiac_mode" name="zodiac_mode" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
                 <option value="tropical" @selected(old('zodiac_mode', $user->zodiac_mode ?? 'tropical') === 'tropical')>{{ __('horoscope.zodiac_tropical') }}</option>

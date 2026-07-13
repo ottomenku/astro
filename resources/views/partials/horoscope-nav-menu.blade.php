@@ -5,6 +5,12 @@
     class="absolute right-0 top-full mt-1 z-50 w-56 rounded-md bg-white border border-gray-200 shadow-lg py-1 text-sm"
 >
     <a
+        href="{{ route('home') }}"
+        class="block px-4 py-2 text-gray-700 hover:bg-gray-50 {{ request()->routeIs('home') ? 'font-semibold text-indigo-600' : '' }}"
+    >
+        {{ __('app.homepage') }}
+    </a>
+    <a
         href="{{ route('horoscope.index') }}"
         class="block px-4 py-2 text-gray-700 hover:bg-gray-50 {{ request()->routeIs('horoscope.*') ? 'font-semibold text-indigo-600' : '' }}"
     >

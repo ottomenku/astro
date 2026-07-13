@@ -28,7 +28,7 @@ class HoroscopeService
             'aspects' => $data['natal']['aspects'] ?? [],
         ];
 
-        return UserHoroscope::create([
+        $horoscope = UserHoroscope::create([
             'user_id' => $user->id,
             'kind' => 'natal',
             'label' => 'Natál',
@@ -38,6 +38,14 @@ class HoroscopeService
             'data' => $store,
             'calculated_at' => now(),
         ]);
+
+        try {
+            app(AstrologyChartScoringService::class)->scoreUserHoroscope($horoscope);
+        } catch (\Throwable) {
+            // Az értékelés később újraszámolható.
+        }
+
+        return $horoscope;
     }
 
     /**

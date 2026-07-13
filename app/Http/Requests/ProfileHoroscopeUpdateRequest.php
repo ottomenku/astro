@@ -20,6 +20,7 @@ class ProfileHoroscopeUpdateRequest extends FormRequest
         return [
             'house_system' => ['required', 'string', Rule::in(['whole_sign', 'placidus'])],
             'zodiac_mode' => ['required', 'string', Rule::in(['tropical', 'sidereal'])],
+            'scoring_profile_id' => ['nullable', 'integer', 'exists:scoring_profiles,id'],
             'current_tz_offset' => ['nullable', 'numeric', 'between:-14,14'],
             'current_place_label' => ['nullable', 'string', 'max:255'],
             'current_lat' => ['nullable', 'numeric', 'between:-90,90'],

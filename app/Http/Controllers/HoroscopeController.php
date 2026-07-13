@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AstrologyChartScoringService;
+use App\Services\AstrologyKnowledgeService;
+use App\Services\ChatPrompts;
 use App\Services\ChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -72,29 +75,66 @@ class HoroscopeController extends Controller
         }
     }
 
+    public function elementInfo(Request $request)
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:sign,planet,fixed_star'],
+            'key' => ['required', 'string', 'max:64'],
+            'title' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        try {
+            $result = app(AstrologyKnowledgeService::class)->resolve(
+                $request->user(),
+                $validated['type'],
+                $validated['key'],
+                app()->getLocale(),
+                (string) ($validated['title'] ?? $validated['key'])
+            );
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $error) {
+            return response()->json([
+                'error' => $error->getMessage(),
+            ], 422);
+        } catch (\Throwable $error) {
+            Log::error('Horoscope element info failed', ['error' => $error->getMessage()]);
+
+            return response()->json([
+                'error' => $error->getMessage() ?: 'Az elem leírása nem érhető el.',
+            ], 500);
+        }
+    }
+
     public function chat(Request $request)
     {
         $validated = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
             'chart' => ['nullable', 'array'],
+            'birth_chart_id' => ['nullable', 'integer'],
         ]);
 
         try {
-            $system = implode("\n", [
-                'Te egy asztrológiai asszisztens vagy.',
-                'Válaszolj magyarul, tömören és érthetően.',
-                'A kérdés az aktuális horoszkóp ábrához kapcsolódik.',
-            ]);
+            $user = $request->user();
+            $scoreContext = null;
 
             if (! empty($validated['chart'])) {
-                $system .= "\n\nAktuális horoszkóp adatok (JSON):\n"
-                    .json_encode($validated['chart'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $chartScore = app(AstrologyChartScoringService::class)->scoreFromCalculatedData(
+                    $user,
+                    $validated['chart'],
+                    $validated['birth_chart_id'] ?? null,
+                );
+                $scoreContext = $chartScore?->toContextArray();
+            } elseif (! empty($validated['birth_chart_id'])) {
+                $existing = app(AstrologyChartScoringService::class)
+                    ->findScoreForBirthChart((int) $validated['birth_chart_id'], $user);
+                $scoreContext = $existing?->toContextArray();
             }
 
             $result = app(ChatService::class)->sendWithSystem(
-                $request->user(),
+                $user,
                 $validated['prompt'],
-                $system
+                ChatPrompts::horoscopeSystem($validated['chart'] ?? null, $scoreContext)
             );
 
             return response()->json([
@@ -123,6 +163,7 @@ class HoroscopeController extends Controller
             'sidereal' => ['sometimes', 'boolean'],
             'ayanamsa' => ['sometimes', 'string', 'in:lahiri'],
             'house_system' => ['sometimes', 'string', 'in:whole_sign,placidus'],
+            'birth_chart_id' => ['nullable', 'integer'],
         ]);
 
         $payload = [
@@ -135,6 +176,18 @@ class HoroscopeController extends Controller
 
         try {
             $data = app(\App\Services\HoroscopeCalculator::class)->calculate($payload);
+
+            if ($request->user()) {
+                try {
+                    app(AstrologyChartScoringService::class)->scoreFromCalculatedData(
+                        $request->user(),
+                        $data,
+                        isset($validated['birth_chart_id']) ? (int) $validated['birth_chart_id'] : null,
+                    );
+                } catch (\Throwable $scoreError) {
+                    Log::warning('Horoscope scoring skipped', ['error' => $scoreError->getMessage()]);
+                }
+            }
 
             return response()->json($data);
         } catch (\Throwable $error) {

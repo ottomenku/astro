@@ -18,6 +18,15 @@
         {{ __('app.profile_horoscope') }}
     </a>
     <a
+        href="{{ route('profile.daily-horoscope.edit') }}"
+        @class([
+            'font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1' => request()->routeIs('profile.daily-horoscope.*'),
+            'text-gray-600 hover:text-gray-900 pb-1' => ! request()->routeIs('profile.daily-horoscope.*'),
+        ])
+    >
+        {{ __('app.profile_daily_horoscope') }}
+    </a>
+    <a
         href="{{ route('profile.birth-charts.index') }}"
         @class([
             'font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1' => request()->routeIs('profile.birth-charts.*'),

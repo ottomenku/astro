@@ -44,6 +44,11 @@ class BirthChart extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function natalChart(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(NatalChart::class);
+    }
+
     /**
      * Lokális születési dátum és idő a tárolt UTC és offset alapján.
      *

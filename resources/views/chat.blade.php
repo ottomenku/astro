@@ -1,16 +1,13 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Chat</h2>
-            <div class="text-sm text-gray-500">OpenAI modell: <span id="modelHint">...</span></div>
-        </div>
-    </x-slot>
-
-    <div class="py-6">
+    <div class="py-4">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="bg-white shadow-sm rounded-lg">
                 <div class="p-6 text-gray-900">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    @include('partials.app-icon-toolbar')
+
+                    <p class="mt-4 text-xs text-gray-500">OpenAI modell: <span id="modelHint">...</span></p>
+
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-6">
                         <!-- Thread lista -->
                         <div class="md:col-span-1">
                             <div class="flex items-center justify-between">
@@ -27,7 +24,6 @@
                                     <div class="text-xs font-medium text-gray-500">Aktív thread</div>
                                     <div class="mt-1 text-sm" id="activeThreadHint">-</div>
                                 </div>
-                                <div class="text-xs text-gray-500">Modell: <span id="modelHint">{{ config('services.openai.model') }}</span></div>
                             </div>
 
                             <div class="hidden p-3 rounded border border-red-200 bg-red-50 text-red-800" id="errorBox"></div>

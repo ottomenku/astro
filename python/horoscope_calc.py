@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 import swisseph as swe
 
+from fixed_stars import calc_fixed_stars
+
 
 PLANETS = [
     (swe.SUN, "Sun"),
@@ -159,6 +161,7 @@ def build_chart(entry: dict, sidereal: bool, house_system: str) -> dict:
     asc_mc = calc_asc_mc(jd, lat, lon, ayanamsa)
     houses = calc_house_cusps(jd, lat, lon, ayanamsa, house_system)
     planets = calc_planets(jd, ayanamsa)
+    fixed_stars = calc_fixed_stars(jd, ayanamsa)
     aspects = calc_aspects(planets)
     for planet in planets:
         # ház számítása: whole_sign esetén ASC alapján, placidusnál cuspok alapján
@@ -190,6 +193,7 @@ def build_chart(entry: dict, sidereal: bool, house_system: str) -> dict:
         "mc": asc_mc["mc"],
         "houses": houses,
         "planets": planets,
+        "fixed_stars": fixed_stars,
         "aspects": aspects,
     }
 

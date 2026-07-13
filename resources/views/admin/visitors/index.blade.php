@@ -1,18 +1,14 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Admin · Látogatók</h2>
-
-            <form method="GET" class="flex items-center gap-2">
-                <x-text-input name="q" :value="$q" placeholder="Keresés (IP / név)" class="w-64" />
-                <x-primary-button>Szűrés</x-primary-button>
-            </form>
-        </div>
-    </x-slot>
-
-    <div class="py-6">
+    <div class="py-4">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @include('admin.partials.nav')
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                @include('partials.app-icon-toolbar')
+                @include('partials.admin-icon-toolbar')
+
+                <form method="GET" class="flex flex-wrap items-center gap-2 mb-4">
+                    <x-text-input name="q" :value="$q" placeholder="Keresés (IP / név)" class="w-64" />
+                    <x-primary-button>Szűrés</x-primary-button>
+                </form>
 
             @if (session('status'))
                 <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
@@ -20,10 +16,8 @@
                 </div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
                             <thead>
                                 <tr class="text-left border-b">
                                     <th class="py-2 pr-4">IP-cím</th>
@@ -83,11 +77,10 @@
                                     </tr>
                                 @endforelse
                             </tbody>
-                        </table>
-                    </div>
-
-                    <div class="mt-4">{{ $visitors->links() }}</div>
+                    </table>
                 </div>
+
+                <div class="mt-4">{{ $visitors->links() }}</div>
             </div>
         </div>
     </div>

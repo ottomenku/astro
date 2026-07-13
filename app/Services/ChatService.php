@@ -43,23 +43,26 @@ class ChatService
         $horoscope = $thread->activeHoroscope()->first() ?: $user->horoscopes()->where('kind', 'natal')->latest('id')->first();
         $horoscopeData = $horoscope?->data;
 
-        $system = implode("\n", [
-            'Te egy asztrológiai asszisztens vagy.',
-            'Válaszolj magyarul, tömören és érthetően.',
-            'A felhasználónak szánt VÉGSŐ választ mindig két kötőjellel kezdd, így: --',
-            'Ha belső megjegyzést/elemzést készítesz, azt ne írd ki a felhasználónak.',
-        ]);
+        $system = ChatPrompts::threadSystem();
 
         $messages = [
             ['role' => 'system', 'content' => $system],
         ];
 
         if (is_array($horoscopeData)) {
-            // Kompakt natál kontextus
+            $scoreContext = $this->resolveScoreContext($user, $horoscope);
             $messages[] = [
                 'role' => 'system',
-                'content' => "Felhasználó natál horoszkóp adatai (kompakt JSON):\n".json_encode($horoscopeData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'content' => ChatPrompts::natalContext($horoscopeData, $scoreContext),
             ];
+        } else {
+            $scoreContext = $this->resolveScoreContext($user, $horoscope);
+            if ($scoreContext !== null) {
+                $messages[] = [
+                    'role' => 'system',
+                    'content' => ChatPrompts::natalContext(null, $scoreContext),
+                ];
+            }
         }
 
         // Előzmények – az utolsó 20 már mentett üzenet (a mostani user üzenet is benne van)
@@ -76,50 +79,7 @@ class ChatService
             $messages[] = ['role' => $role, 'content' => $msg->content];
         }
 
-        // Toolok (MVP): tranzit most + esemény keresés
-        $tools = [
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'transit_now',
-                    'description' => 'Aktuális tranzit pozíció lekérdezése (jelenlegi hely alapján).',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'planet' => ['type' => 'string', 'description' => 'Pl. Mars, Sun, Moon, Mercury, Venus, Jupiter, Saturn, Uranus, Neptune, Pluto'],
-                        ],
-                        'required' => ['planet'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'find_transit_event',
-                    'description' => 'Időablakban megkeresi, hogy mikor következik be egy tranzit esemény (házba lépés / aspektus).',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'datetime_start_utc' => ['type' => 'string', 'description' => 'ISO dátum UTC-ben'],
-                            'datetime_end_utc' => ['type' => 'string', 'description' => 'ISO dátum UTC-ben'],
-                            'event' => [
-                                'type' => 'object',
-                                'properties' => [
-                                    'type' => ['type' => 'string', 'enum' => ['enter_house', 'aspect_to_natal']],
-                                    'planet' => ['type' => 'string'],
-                                    'house' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12],
-                                    'natal_longitude' => ['type' => 'number', 'minimum' => 0, 'maximum' => 360],
-                                    'aspect_angle' => ['type' => 'number', 'enum' => [0, 60, 90, 120, 180]],
-                                    'orb' => ['type' => 'number', 'minimum' => 0, 'maximum' => 10],
-                                ],
-                                'required' => ['type', 'planet'],
-                            ],
-                        ],
-                        'required' => ['datetime_start_utc', 'datetime_end_utc', 'event'],
-                    ],
-                ],
-            ],
-        ];
+        $tools = ChatPrompts::tools();
 
         $response = $this->client->chat($messages, $model, [
             'tools' => $tools,
@@ -245,7 +205,7 @@ class ChatService
         return $this->sendWithSystem(
             $user,
             $prompt,
-            'Te egy asztrológiai asszisztens vagy. Válaszolj magyarul, tömören és érthetően.',
+            ChatPrompts::defaultSystem(),
             $model
         );
     }
@@ -329,5 +289,48 @@ class ChatService
         }
 
         $user->increment('token_quota_used', $total);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveScoreContext(User $user, ?\App\Models\UserHoroscope $horoscope): ?array
+    {
+        $scoring = app(AstrologyChartScoringService::class);
+
+        if ($horoscope) {
+            $natalChart = \App\Models\NatalChart::query()
+                ->where('user_horoscope_id', $horoscope->id)
+                ->first();
+
+            if ($natalChart) {
+                $score = $scoring->findScoreForNatalChart($natalChart, $user);
+                if ($score) {
+                    return $score->toContextArray();
+                }
+            }
+
+            try {
+                return $scoring->scoreUserHoroscope($horoscope)->toContextArray();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        $birthChart = $user->defaultBirthChart();
+        if (! $birthChart) {
+            return null;
+        }
+
+        $existing = $scoring->findScoreForBirthChart($birthChart->id, $user);
+        if ($existing) {
+            return $existing->toContextArray();
+        }
+
+        try {
+            return $scoring->scoreBirthChart($birthChart, $user)->toContextArray();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

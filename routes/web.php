@@ -1,27 +1,23 @@
 <?php
 
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\ProfileBirthChartController;
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfileDailyHoroscopeController;
 use App\Http\Controllers\ProfileHoroscopeController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatThreadController;
 use App\Http\Controllers\HoroscopeController;
 use App\Http\Controllers\HoroscopeToolsController;
 use App\Http\Controllers\Admin\AdminConversationController;
+use App\Http\Controllers\Admin\AdminDailyHoroscopeController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminVisitorController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
-Route::get('/', function () {
-    if (auth()->check()) {
-        return redirect()->route('horoscope.index');
-    }
-
-    return view('welcome');
-});
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::get('/dashboard', function () {
     return redirect()->route('horoscope.index');
@@ -33,6 +29,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/profile/horoscope', [ProfileHoroscopeController::class, 'edit'])->name('profile.horoscope.edit');
     Route::patch('/profile/horoscope', [ProfileHoroscopeController::class, 'update'])->name('profile.horoscope.update');
+    Route::get('/profile/daily-horoscope', [ProfileDailyHoroscopeController::class, 'edit'])->name('profile.daily-horoscope.edit');
+    Route::patch('/profile/daily-horoscope', [ProfileDailyHoroscopeController::class, 'update'])->name('profile.daily-horoscope.update');
 
     Route::get('/profile/birth-charts', [ProfileBirthChartController::class, 'index'])->name('profile.birth-charts.index');
     Route::get('/profile/birth-charts/create', [ProfileBirthChartController::class, 'create'])->name('profile.birth-charts.create');
@@ -52,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/horoscope', [HoroscopeController::class, 'index'])->name('horoscope.index');
     Route::get('/api/geocode', [HoroscopeController::class, 'geocode'])->name('horoscope.geocode');
     Route::post('/api/horoscope/calc', [HoroscopeController::class, 'calculate'])->name('horoscope.calculate');
+    Route::post('/api/horoscope/info', [HoroscopeController::class, 'elementInfo'])->name('horoscope.info');
     Route::post('/api/horoscope/chat', [HoroscopeController::class, 'chat'])->name('horoscope.chat');
 
     Route::post('/api/tools/transit/now', [HoroscopeToolsController::class, 'transitNow'])->name('tools.transit.now');
@@ -68,6 +67,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
 
     Route::get('/conversations', [AdminConversationController::class, 'index'])->name('conversations.index');
+
+    Route::get('/daily-horoscope', [AdminDailyHoroscopeController::class, 'edit'])->name('daily-horoscope.edit');
+    Route::put('/daily-horoscope/system', [AdminDailyHoroscopeController::class, 'updateSystem'])->name('daily-horoscope.system.update');
+    Route::put('/daily-horoscope/generation', [AdminDailyHoroscopeController::class, 'updateGeneration'])->name('daily-horoscope.generation.update');
+    Route::post('/daily-horoscope/regenerate', [AdminDailyHoroscopeController::class, 'regenerate'])->name('daily-horoscope.regenerate');
+    Route::put('/daily-horoscope/message', [AdminDailyHoroscopeController::class, 'updateMessage'])->name('daily-horoscope.message.update');
+    Route::post('/daily-horoscope/publish', [AdminDailyHoroscopeController::class, 'publish'])->name('daily-horoscope.publish');
 });
 
 require __DIR__.'/auth.php';

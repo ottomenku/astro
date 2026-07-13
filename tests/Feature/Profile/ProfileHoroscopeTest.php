@@ -3,12 +3,19 @@
 namespace Tests\Feature\Profile;
 
 use App\Models\User;
+use Database\Seeders\AstrologyScoringProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ProfileHoroscopeTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(AstrologyScoringProfileSeeder::class);
+    }
 
     public function test_horoscope_settings_page_is_displayed(): void
     {
@@ -18,7 +25,8 @@ class ProfileHoroscopeTest extends TestCase
             ->get(route('profile.horoscope.edit'))
             ->assertOk()
             ->assertSee(__('app.profile_horoscope'))
-            ->assertSee(__('app.horoscope_type'));
+            ->assertSee(__('app.horoscope_type'))
+            ->assertSee(__('app.scoring_profile'));
     }
 
     public function test_horoscope_settings_can_be_updated(): void

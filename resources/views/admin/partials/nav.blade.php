@@ -11,4 +11,8 @@
        class="{{ request()->routeIs('admin.conversations.*') ? 'font-semibold text-indigo-600 underline' : 'text-gray-600 hover:text-gray-900' }}">
         Konverzációk
     </a>
+    <a href="{{ route('admin.daily-horoscope.edit') }}"
+       class="{{ request()->routeIs('admin.daily-horoscope.*') ? 'font-semibold text-indigo-600 underline' : 'text-gray-600 hover:text-gray-900' }}">
+        Napi horoszkóp
+    </a>
 </nav>
