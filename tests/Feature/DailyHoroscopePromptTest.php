@@ -35,7 +35,7 @@ class DailyHoroscopePromptTest extends TestCase
         $prompt = app(DailyHoroscopePromptBuilder::class)->userPrompt('hu', $chart, $score);
 
         $this->assertStringContainsString('Írj konkrét napi horoszkópot.', $prompt);
-        $this->assertStringContainsString('"Sun"', $prompt);
+        $this->assertStringContainsString('"Nap"', $prompt);
         $this->assertStringContainsString('"erős"', $prompt);
         $this->assertStringContainsString('automatikusan csatolva', $prompt);
     }
@@ -65,7 +65,7 @@ class DailyHoroscopePromptTest extends TestCase
         $prompt = app(DailyHoroscopePromptBuilder::class)->globalUserPrompt('hu', $chart, $score);
 
         $this->assertStringContainsString('Legyen optimista, de konkrét.', $prompt);
-        $this->assertStringContainsString('"Sun"', $prompt);
+        $this->assertStringContainsString('"Nap"', $prompt);
     }
 
     public function test_admin_can_update_generation_settings(): void

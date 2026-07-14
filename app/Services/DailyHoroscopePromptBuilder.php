@@ -7,6 +7,10 @@ use App\Models\UserDailyHoroscopeSetting;
 
 class DailyHoroscopePromptBuilder
 {
+    public function __construct(
+        private readonly DailyHoroscopeLlmContextBuilder $llmContext,
+    ) {}
+
     public function globalSystemInstructions(string $locale): string
     {
         $setting = DailyHoroscopeSetting::forLocale($locale);
@@ -103,10 +107,14 @@ class DailyHoroscopePromptBuilder
         array $scoreContext,
         ?array $attachedChartPayload,
     ): string {
-        $chartJson = $this->encodeJson($chartPayload);
-        $scoreJson = $this->encodeJson($scoreContext);
-        $attachedJson = $attachedChartPayload !== null && $attachedChartPayload !== []
-            ? $this->encodeJson($attachedChartPayload)
+        $chartForLlm = $this->llmContext->buildChartContext($chartPayload, $locale);
+        $scoreForLlm = $this->llmContext->buildScoreSummary($scoreContext);
+        $attachedForLlm = $this->llmContext->buildAttachedContext($attachedChartPayload, $locale);
+
+        $chartJson = $this->encodeJson($chartForLlm);
+        $scoreJson = $this->encodeJson($scoreForLlm);
+        $attachedJson = $attachedForLlm !== null && $attachedForLlm !== []
+            ? $this->encodeJson($attachedForLlm)
             : '';
 
         $hasChartPlaceholder = str_contains($template, ':chart_json');
@@ -152,13 +160,13 @@ class DailyHoroscopePromptBuilder
     {
         $labels = [
             'hu' => [
-                'chart' => 'Horoszkóp adatok (JSON, automatikusan csatolva):',
-                'score' => 'Pontozási értékelés (JSON, automatikusan csatolva):',
+                'chart' => 'Szignifikáns képlet-adatok (JSON, automatikusan csatolva):',
+                'score' => 'Pontozási összesítő (JSON, automatikusan csatolva):',
                 'attached' => 'Csatolt mentett horoszkóp (JSON, automatikusan csatolva):',
             ],
             'en' => [
-                'chart' => 'Chart data (JSON, appended automatically):',
-                'score' => 'Scoring evaluation (JSON, appended automatically):',
+                'chart' => 'Significant chart data (JSON, appended automatically):',
+                'score' => 'Scoring summary (JSON, appended automatically):',
                 'attached' => 'Attached saved chart (JSON, appended automatically):',
             ],
         ];
