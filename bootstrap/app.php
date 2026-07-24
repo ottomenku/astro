@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetLocale::class,
             \App\Http\Middleware\CheckBannedIp::class,
             \App\Http\Middleware\TrackSiteVisitor::class,
+            \App\Http\Middleware\LogPageVisit::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

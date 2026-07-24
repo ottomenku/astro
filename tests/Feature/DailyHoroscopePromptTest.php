@@ -53,6 +53,39 @@ class DailyHoroscopePromptTest extends TestCase
         $this->assertStringContainsString('"motto"', $full);
     }
 
+    public function test_weekly_system_prompt_includes_extended_length_requirements(): void
+    {
+        $builder = app(DailyHoroscopePromptBuilder::class);
+        $weekly = $builder->globalSystemPrompt('hu', \App\Support\HoroscopePeriod::WEEKLY);
+        $monthly = $builder->globalSystemPrompt('hu', \App\Support\HoroscopePeriod::MONTHLY);
+
+        $this->assertStringContainsString('HETI HOSSZ KÖVETELMÉNY', $weekly);
+        $this->assertStringContainsString('legalább 20 teljes mondat', $weekly);
+        $this->assertStringContainsString('legalább 10 mondat', $weekly);
+
+        $this->assertStringContainsString('HAVI HOSSZ KÖVETELMÉNY', $monthly);
+        $this->assertStringContainsString('legalább 20 teljes mondat', $monthly);
+    }
+
+    public function test_weekly_user_prompt_includes_length_guidance(): void
+    {
+        $chart = ['natal' => ['planets' => [['name' => 'Sun', 'sign' => 'Leo']]]];
+        $score = ['rating_label' => 'erős'];
+        $periodContext = ['period_type' => 'weekly', 'opening' => [], 'closing' => []];
+
+        $prompt = app(DailyHoroscopePromptBuilder::class)->globalUserPromptForPeriod(
+            'hu',
+            \App\Support\HoroscopePeriod::WEEKLY,
+            $chart,
+            $score,
+            null,
+            $periodContext,
+        );
+
+        $this->assertStringContainsString('legalább 20 mondat', $prompt);
+        $this->assertStringContainsString('10–15 mondat', $prompt);
+    }
+
     public function test_user_prompt_append_is_included(): void
     {
         DailyHoroscopeSetting::forLocale('hu')->update([

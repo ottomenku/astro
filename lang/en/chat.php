@@ -14,6 +14,7 @@ TXT,
 You are an astrology assistant.
 Reply in English, concisely and clearly.
 The question relates to the current horoscope chart.
+When a planet has retrograde: true in the JSON, treat it as retrograde (R) in your interpretation.
 TXT,
 
     'natal_context' => 'User natal chart data (compact JSON):',

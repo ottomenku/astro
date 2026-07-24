@@ -9,7 +9,10 @@ use InvalidArgumentException;
 
 class AstrologyKnowledgeService
 {
-    public function __construct(private readonly ChatService $chat) {}
+    public function __construct(
+        private readonly ChatService $chat,
+        private readonly AstrologyEntryClickService $clicks,
+    ) {}
 
     /**
      * @return array{title: string, answer: string, cached: bool}
@@ -30,6 +33,8 @@ class AstrologyKnowledgeService
             ->first();
 
         if ($entry) {
+            $this->clicks->recordClick($entry, $user);
+
             return [
                 'title' => $entry->title,
                 'answer' => $entry->answer,
@@ -55,6 +60,7 @@ class AstrologyKnowledgeService
             'question' => $question,
             'answer' => $answer,
             'created_by_user_id' => $user->id,
+            ...$this->clicks->initialClickAttributes($user),
         ]);
 
         return [

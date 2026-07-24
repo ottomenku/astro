@@ -4,6 +4,15 @@
 @endphp
 
 <div class="flex flex-wrap gap-2 mb-4">
+    <a href="{{ route('admin.page-visits.logs') }}"
+       class="{{ request()->routeIs('admin.page-visits.*') ? $iconBtnActive : $iconBtn }}"
+       title="Oldalmegtekintések"
+       aria-label="Oldalmegtekintések">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 3v18h18" />
+            <path d="M7 14l4-4 3 3 5-7" />
+        </svg>
+    </a>
     <a href="{{ route('admin.visitors.index') }}"
        class="{{ request()->routeIs('admin.visitors.*') ? $iconBtnActive : $iconBtn }}"
        title="Látogatók"
@@ -30,6 +39,16 @@
        aria-label="Konverzációk">
         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+        </svg>
+    </a>
+    <a href="{{ route('admin.astrology-entries.index') }}"
+       class="{{ request()->routeIs('admin.astrology-entries.*') ? $iconBtnActive : $iconBtn }}"
+       title="{{ __('app.admin_astrology_entries') }}"
+       aria-label="{{ __('app.admin_astrology_entries') }}">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
         </svg>
     </a>
     <a href="{{ route('admin.daily-horoscope.edit') }}"

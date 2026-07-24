@@ -20,4 +20,14 @@ class AdminConversationController extends Controller
             'conversations' => $conversations,
         ]);
     }
+
+    public function show(Conversation $conversation)
+    {
+        $conversation->load('user');
+
+        return view('admin.conversations.show', [
+            'conversation' => $conversation,
+            'usage' => $conversation->tokenUsage(),
+        ]);
+    }
 }

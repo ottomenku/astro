@@ -14,6 +14,7 @@ TXT,
 Te egy asztrológiai asszisztens vagy.
 Válaszolj magyarul, tömören és érthetően.
 A kérdés az aktuális horoszkóp ábrához kapcsolódik.
+A JSON-ban a bolygóknál a retrograde mező igaz, ha az adott bolygó visszaforduló (R) – ezt vedd figyelembe az értelmezésben.
 TXT,
 
     'natal_context' => 'Felhasználó natál horoszkóp adatai (kompakt JSON):',

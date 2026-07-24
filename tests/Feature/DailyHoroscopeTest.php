@@ -10,6 +10,7 @@ use App\Models\UserDailyHoroscopeSetting;
 use App\Services\DailyHoroscopePromptBuilder;
 use App\Services\DailyHoroscopeService;
 use App\Services\HoroscopeCalculator;
+use App\Support\HoroscopePeriod;
 use Database\Seeders\AstrologyScoringProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -28,23 +29,10 @@ class DailyHoroscopeTest extends TestCase
 
     public function test_home_page_shows_published_daily_message(): void
     {
-        DailyHoroscopeMessage::create([
-            'forecast_date' => now('Europe/Budapest')->toDateString(),
-            'locale' => 'hu',
-            'status' => DailyHoroscopeMessage::STATUS_PUBLISHED,
-            'chart_datetime_utc' => now(),
-            'chart_payload' => ['natal' => []],
-            'score_payload' => ['rating_label' => 'erős'],
-            'scoring_profile_name' => 'Astro Motto alap pontozás',
+        DailyHoroscopeMessage::create($this->publishedMessageAttributes([
             'motto' => 'Ma bízz a ritmusban.',
             'summary' => 'A csillagok ma támogató hangulatot sugallnak.',
-            'health' => 'Pihenj eleget.',
-            'money' => 'Lassú, de stabil nap.',
-            'relationships' => 'Nyílt szó segít.',
-            'work' => 'Fókuszálj egy feladatra.',
-            'generated_at' => now(),
-            'published_at' => now(),
-        ]);
+        ]));
 
         $this->withSession(['locale' => 'hu'])
             ->get(route('home'))
@@ -55,21 +43,16 @@ class DailyHoroscopeTest extends TestCase
 
     public function test_home_page_hides_unpublished_draft(): void
     {
-        DailyHoroscopeMessage::create([
-            'forecast_date' => now('Europe/Budapest')->toDateString(),
-            'locale' => 'hu',
+        DailyHoroscopeMessage::create($this->publishedMessageAttributes([
             'status' => DailyHoroscopeMessage::STATUS_DRAFT,
-            'chart_datetime_utc' => now(),
-            'chart_payload' => ['natal' => []],
-            'score_payload' => [],
             'motto' => 'Titkos piszkozat.',
             'summary' => 'Rejtett.',
             'health' => 'Rejtett.',
             'money' => 'Rejtett.',
             'relationships' => 'Rejtett.',
             'work' => 'Rejtett.',
-            'generated_at' => now(),
-        ]);
+            'published_at' => null,
+        ]));
 
         DailyHoroscopeSetting::forLocale('hu')->update(['auto_publish' => false]);
 
@@ -84,21 +67,16 @@ class DailyHoroscopeTest extends TestCase
     {
         $admin = User::factory()->create(['is_admin' => true]);
 
-        DailyHoroscopeMessage::create([
-            'forecast_date' => now('Europe/Budapest')->toDateString(),
-            'locale' => 'hu',
+        DailyHoroscopeMessage::create($this->publishedMessageAttributes([
             'status' => DailyHoroscopeMessage::STATUS_DRAFT,
-            'chart_datetime_utc' => now(),
-            'chart_payload' => ['natal' => []],
-            'score_payload' => [],
             'motto' => 'Piszkozat mottó.',
             'summary' => 'Piszkozat összefoglaló.',
             'health' => 'Egészség szöveg.',
             'money' => 'Pénz szöveg.',
             'relationships' => 'Párkapcsolat szöveg.',
             'work' => 'Munka szöveg.',
-            'generated_at' => now(),
-        ]);
+            'published_at' => null,
+        ]));
 
         $this->actingAs($admin)
             ->post(route('admin.daily-horoscope.publish'), ['locale' => 'hu'])
@@ -124,7 +102,7 @@ class DailyHoroscopeTest extends TestCase
         $mockChart = $this->mockChartPayload();
 
         $this->mock(HoroscopeCalculator::class, function ($mock) use ($mockChart) {
-            $mock->shouldReceive('calculate')->once()->andReturn($mockChart);
+            $mock->shouldReceive('calculate')->andReturn($mockChart);
         });
 
         Http::fake([
@@ -151,6 +129,88 @@ class DailyHoroscopeTest extends TestCase
         $this->assertTrue($message?->isPublished());
     }
 
+    public function test_home_page_triggers_global_generation_for_guest_on_first_visit(): void
+    {
+        $mockChart = $this->mockChartPayload();
+
+        $this->mock(HoroscopeCalculator::class, function ($mock) use ($mockChart) {
+            $mock->shouldReceive('calculate')->andReturn($mockChart);
+        });
+
+        Http::fake([
+            '*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'motto' => 'Első látogató napja.',
+                            'summary' => 'A mai üzenet automatikusan készült.',
+                            'health' => 'Egészség szöveg.',
+                            'money' => 'Pénz szöveg.',
+                            'relationships' => 'Párkapcsolat szöveg.',
+                            'work' => 'Munka szöveg.',
+                        ], JSON_UNESCAPED_UNICODE),
+                    ],
+                ]],
+                'usage' => ['total_tokens' => 10],
+            ]),
+        ]);
+
+        $this->withSession(['locale' => 'hu'])
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSee('Első látogató napja.');
+
+        $this->assertDatabaseCount('daily_horoscope_messages', 1);
+        $this->assertDatabaseHas('daily_horoscope_messages', [
+            'motto' => 'Első látogató napja.',
+            'status' => DailyHoroscopeMessage::STATUS_PUBLISHED,
+        ]);
+    }
+
+    public function test_home_page_generates_global_even_when_user_has_personal_daily(): void
+    {
+        $user = User::factory()->create();
+        UserDailyHoroscopeSetting::forUser($user)->update(['use_personal_daily' => true]);
+
+        $mockChart = $this->mockChartPayload();
+
+        $this->mock(HoroscopeCalculator::class, function ($mock) use ($mockChart) {
+            $mock->shouldReceive('calculate')->andReturn($mockChart);
+        });
+
+        Http::fake([
+            '*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'motto' => 'Globális mottó.',
+                            'summary' => 'Globális összefoglaló.',
+                            'health' => 'Egészség.',
+                            'money' => 'Pénz.',
+                            'relationships' => 'Kapcsolat.',
+                            'work' => 'Munka.',
+                        ], JSON_UNESCAPED_UNICODE),
+                    ],
+                ]],
+                'usage' => ['total_tokens' => 10],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['locale' => 'hu'])
+            ->get(route('home'))
+            ->assertOk();
+
+        $this->assertDatabaseHas('daily_horoscope_messages', [
+            'motto' => 'Globális mottó.',
+            'status' => DailyHoroscopeMessage::STATUS_PUBLISHED,
+        ]);
+        $this->assertDatabaseHas('user_daily_horoscope_messages', [
+            'user_id' => $user->id,
+            'motto' => 'Globális mottó.',
+        ]);
+    }
+
     public function test_daily_message_is_generated_once_per_locale_and_date(): void
     {
         $user = User::factory()->create();
@@ -159,7 +219,7 @@ class DailyHoroscopeTest extends TestCase
         $mockChart = $this->mockChartPayload();
 
         $this->mock(HoroscopeCalculator::class, function ($mock) use ($mockChart) {
-            $mock->shouldReceive('calculate')->once()->andReturn($mockChart);
+            $mock->shouldReceive('calculate')->andReturn($mockChart);
         });
 
         Http::fake([
@@ -187,6 +247,57 @@ class DailyHoroscopeTest extends TestCase
         $this->assertSame($first->id, $second->id);
         $this->assertDatabaseCount('daily_horoscope_messages', 1);
         $this->assertSame('Ma merész légy.', $first->motto);
+    }
+
+    public function test_home_page_shows_published_weekly_message(): void
+    {
+        $bounds = HoroscopePeriod::bounds(HoroscopePeriod::WEEKLY);
+
+        DailyHoroscopeMessage::create($this->publishedMessageAttributes([
+            'period_type' => HoroscopePeriod::WEEKLY,
+            'period_start' => $bounds['start']->toDateString(),
+            'period_end' => $bounds['end']->toDateString(),
+            'forecast_date' => $bounds['forecast_date']->toDateString(),
+            'motto' => 'Erős hét indul.',
+            'summary' => 'A hét eleje és vége között markáns váltás látszik.',
+        ]));
+
+        $this->withSession(['locale' => 'hu'])
+            ->get(route('home', ['period' => HoroscopePeriod::WEEKLY]))
+            ->assertOk()
+            ->assertSee('Erős hét indul.')
+            ->assertSee(__('daily.period_weekly'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function publishedMessageAttributes(array $overrides = []): array
+    {
+        $date = now('Europe/Budapest')->toDateString();
+
+        return array_merge([
+            'forecast_date' => $date,
+            'locale' => 'hu',
+            'period_type' => HoroscopePeriod::DAILY,
+            'period_start' => $date,
+            'period_end' => $date,
+            'status' => DailyHoroscopeMessage::STATUS_PUBLISHED,
+            'chart_datetime_utc' => now(),
+            'chart_payload' => ['natal' => []],
+            'period_context' => ['period_type' => HoroscopePeriod::DAILY],
+            'score_payload' => ['rating_label' => 'erős'],
+            'scoring_profile_name' => 'Astro Motto alap pontozás',
+            'motto' => 'Mottó.',
+            'summary' => 'Összefoglaló.',
+            'health' => 'Egészség.',
+            'money' => 'Pénz.',
+            'relationships' => 'Kapcsolat.',
+            'work' => 'Munka.',
+            'generated_at' => now(),
+            'published_at' => now(),
+        ], $overrides);
     }
 
     /**

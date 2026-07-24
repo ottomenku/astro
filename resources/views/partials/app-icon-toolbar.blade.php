@@ -1,9 +1,12 @@
 @php
     $iconBtn = 'px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center text-gray-700 hover:bg-gray-50';
     $iconBtnActive = 'px-3 py-2 rounded border border-indigo-400 bg-indigo-50 inline-flex items-center justify-center text-indigo-700';
+    $horoscopeMode = request()->routeIs('horoscope.index')
+        ? (request()->query('mode') === 'dual' ? 'dual' : 'single')
+        : null;
 @endphp
 
-<div class="relative flex flex-wrap gap-2 pb-2 items-center" x-data="{ menuOpen: false }">
+<div class="relative flex flex-wrap gap-2 pb-2 items-center" x-data="{ menuOpen: false, adminOpen: false }">
     <a href="{{ route('home') }}"
        class="{{ request()->routeIs('home') ? $iconBtnActive : $iconBtn }}"
        title="{{ __('app.homepage') }}"
@@ -15,17 +18,20 @@
     </a>
 
     <a href="{{ route('horoscope.index') }}"
-       class="{{ request()->routeIs('horoscope.*') ? $iconBtnActive : $iconBtn }}"
+       class="{{ $horoscopeMode === 'single' ? $iconBtnActive : $iconBtn }}"
        title="{{ __('app.horoscope') }}"
        aria-label="{{ __('app.horoscope') }}">
-        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 3v18M3 12h18" />
-        </svg>
+        @include('partials.icons.horoscope-wheel')
     </a>
 
-    <a href="{{ route('chat.index') }}"
+    <a href="{{ route('horoscope.index', ['mode' => 'dual']) }}"
+       class="{{ $horoscopeMode === 'dual' ? $iconBtnActive : $iconBtn }}"
+       title="{{ __('app.dual_horoscope') }}"
+       aria-label="{{ __('app.dual_horoscope') }}">
+        @include('partials.icons.dual-horoscope-wheels')
+    </a>
+
+    <a href="{{ auth()->check() ? route('chat.index') : route('login') }}"
        class="{{ request()->routeIs('chat.*') ? $iconBtnActive : $iconBtn }}"
        title="{{ __('app.chat') }}"
        aria-label="{{ __('app.chat') }}">
@@ -34,30 +40,26 @@
         </svg>
     </a>
 
-    @if (Auth::user()?->is_admin)
-        <a href="{{ route('admin.visitors.index') }}"
-           class="{{ request()->routeIs('admin.*') ? $iconBtnActive : $iconBtn }}"
-           title="{{ __('app.admin') }}"
-           aria-label="{{ __('app.admin') }}">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 15v2" />
-                <path d="M12 3v2" />
-                <path d="M4.93 4.93l1.41 1.41" />
-                <path d="M17.66 17.66l1.41 1.41" />
-                <path d="M3 12h2" />
-                <path d="M19 12h2" />
-                <path d="M4.93 19.07l1.41-1.41" />
-                <path d="M17.66 6.34l1.41-1.41" />
-                <circle cx="12" cy="12" r="4" />
-            </svg>
-        </a>
-    @endif
-
     <div class="ml-auto flex flex-wrap gap-2 items-center">
         @include('partials.locale-select')
+
+        @if (Auth::user()?->is_admin)
+            <div class="relative">
+                <button type="button"
+                        class="{{ request()->routeIs('admin.*') ? $iconBtnActive : $iconBtn }} min-w-[2.5rem] font-bold text-lg leading-none"
+                        @click="adminOpen = !adminOpen; menuOpen = false"
+                        :aria-expanded="adminOpen"
+                        title="{{ __('app.admin') }}"
+                        aria-label="{{ __('app.admin') }}">
+                    A
+                </button>
+                @include('partials.admin-menu-dropdown')
+            </div>
+        @endif
+
         <button type="button"
                 class="{{ $iconBtn }}"
-                @click="menuOpen = !menuOpen"
+                @click="menuOpen = !menuOpen; adminOpen = false"
                 :aria-expanded="menuOpen"
                 aria-label="{{ __('app.menu') }}">
             <svg class="h-5 w-5" stroke="currentColor" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,6 +67,7 @@
                 <path :class="{'hidden': !menuOpen, 'inline-flex': menuOpen}" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
-        @include('partials.horoscope-nav-menu')
+
+        @include('partials.app-user-menu')
     </div>
 </div>

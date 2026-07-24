@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\DailyHoroscopeSetting;
+use App\Models\HoroscopeDailyMessage;
 use App\Models\UserDailyHoroscopeSetting;
+use App\Support\HoroscopePeriod;
 
 class DailyHoroscopePromptBuilder
 {
@@ -23,29 +25,49 @@ class DailyHoroscopePromptBuilder
         return ChatPrompts::dailyHoroscopeSystemInstructions($locale);
     }
 
-    public function globalSystemOutputFormat(string $locale): string
+    public function globalSystemOutputFormat(string $locale, string $periodType = HoroscopePeriod::DAILY): string
     {
-        return ChatPrompts::dailyHoroscopeSystemOutputFormat($locale)
+        $base = ChatPrompts::dailyHoroscopeSystemOutputFormat($locale)
             ."\n\n"
             .ChatPrompts::dailyHoroscopeResponseLanguage($locale);
+
+        return match (HoroscopePeriod::normalize($periodType)) {
+            HoroscopePeriod::WEEKLY => $base."\n\n".__('daily.weekly_output_length', [], $locale),
+            HoroscopePeriod::MONTHLY => $base."\n\n".__('daily.monthly_output_length', [], $locale),
+            default => $base,
+        };
     }
 
-    public function globalSystemPrompt(string $locale): string
+    public function globalSystemPrompt(string $locale, string $periodType = HoroscopePeriod::DAILY): string
     {
-        return $this->globalSystemInstructions($locale)
+        $prompt = $this->globalSystemInstructions($locale)
             ."\n\n"
-            .$this->globalSystemOutputFormat($locale);
+            .$this->globalSystemOutputFormat($locale, $periodType);
+
+        return match (HoroscopePeriod::normalize($periodType)) {
+            HoroscopePeriod::WEEKLY => $prompt."\n\n".__('daily.weekly_system_instructions', [], $locale),
+            HoroscopePeriod::MONTHLY => $prompt."\n\n".__('daily.monthly_system_instructions', [], $locale),
+            default => $prompt,
+        };
     }
 
     public function userSystemPrompt(UserDailyHoroscopeSetting $setting, string $locale): string
     {
+        return $this->userSystemPromptForPeriod($setting, $locale, HoroscopePeriod::DAILY);
+    }
+
+    public function userSystemPromptForPeriod(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        string $periodType = HoroscopePeriod::DAILY,
+    ): string {
         $custom = trim((string) ($setting->system_prompt ?? ''));
 
-        if ($custom !== '') {
-            return $custom."\n\n".$this->globalSystemOutputFormat($locale);
-        }
+        $base = $custom !== ''
+            ? $custom."\n\n".$this->globalSystemOutputFormat($locale, $periodType)
+            : $this->globalSystemPrompt($locale, $periodType);
 
-        return $this->globalSystemPrompt($locale);
+        return $base;
     }
 
     /**
@@ -93,6 +115,328 @@ class DailyHoroscopePromptBuilder
         }
 
         return $this->assembleUserPrompt($locale, $template, $chartPayload, $scoreContext, $attachedChartPayload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $attachedChartPayload
+     * @param  array<string, mixed>  $periodContext
+     */
+    public function globalUserPromptForPeriod(
+        string $locale,
+        string $periodType,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $attachedChartPayload,
+        array $periodContext,
+    ): string {
+        $prompt = $this->globalUserPrompt($locale, $chartPayload, $scoreContext, $attachedChartPayload);
+
+        return $this->appendPeriodContext($prompt, $locale, $periodType, $periodContext);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $attachedChartPayload
+     * @param  array<string, mixed>  $periodContext
+     */
+    public function userUserPromptForPeriod(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        string $periodType,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $attachedChartPayload,
+        array $periodContext,
+    ): string {
+        $prompt = $this->userUserPrompt($setting, $locale, $chartPayload, $scoreContext, $attachedChartPayload);
+
+        return $this->appendPeriodContext($prompt, $locale, $periodType, $periodContext);
+    }
+
+    /**
+     * @param  array<string, mixed>  $periodContext
+     */
+    private function appendPeriodContext(
+        string $prompt,
+        string $locale,
+        string $periodType,
+        array $periodContext,
+    ): string {
+        $periodType = HoroscopePeriod::normalize($periodType);
+        $append = match ($periodType) {
+            HoroscopePeriod::WEEKLY => trim((string) __('daily.weekly_user_append', [], $locale)),
+            HoroscopePeriod::MONTHLY => trim((string) __('daily.monthly_user_append', [], $locale)),
+            default => trim((string) __('daily.daily_user_append', [], $locale)),
+        };
+
+        $blocks = [rtrim($prompt)];
+
+        if ($append !== '') {
+            $blocks[] = $append;
+        }
+
+        $blocks[] = $this->periodContextLabel($locale)."\n".$this->encodeJson($periodContext);
+
+        return implode("\n\n", $blocks);
+    }
+
+    private function periodContextLabel(string $locale): string
+    {
+        return (string) __('daily.period_context_label', [], $locale);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $attachedChartPayload
+     */
+    public function horoscopePersonalUserPrompt(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $attachedChartPayload = null,
+    ): string {
+        return $this->horoscopePersonalUserPromptForPeriod(
+            $setting,
+            $locale,
+            HoroscopePeriod::DAILY,
+            $chartPayload,
+            $scoreContext,
+            $attachedChartPayload,
+            [],
+        );
+    }
+
+    public function horoscopePersonalSystemPrompt(UserDailyHoroscopeSetting $setting, string $locale): string
+    {
+        return $this->horoscopePersonalSystemPromptForPeriod($setting, $locale, HoroscopePeriod::DAILY);
+    }
+
+    public function horoscopePersonalSystemPromptForPeriod(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        string $periodType = HoroscopePeriod::DAILY,
+    ): string {
+        return $this->userSystemPromptForPeriod($setting, $locale, $periodType)
+            ."\n\n"
+            .__('daily.horoscope_personal_instructions', [], $locale)
+            ."\n\n"
+            .__('daily.horoscope_personal_period_instructions', [
+                'period' => __('daily.period_'.HoroscopePeriod::normalize($periodType), [], $locale),
+            ], $locale);
+    }
+
+    public function horoscopePartnershipSystemPrompt(string $locale): string
+    {
+        return $this->horoscopePartnershipSystemPromptForPeriod($locale, HoroscopePeriod::DAILY);
+    }
+
+    public function horoscopePartnershipSystemPromptForPeriod(
+        string $locale,
+        string $periodType = HoroscopePeriod::DAILY,
+    ): string {
+        return $this->globalSystemPrompt($locale, $periodType)
+            ."\n\n"
+            .__('daily.horoscope_partnership_instructions', [], $locale)
+            ."\n\n"
+            .__('daily.horoscope_partnership_period_instructions', [
+                'period' => __('daily.period_'.HoroscopePeriod::normalize($periodType), [], $locale),
+            ], $locale);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $attachedChartPayload
+     * @param  array<string, mixed>  $periodContext
+     */
+    public function horoscopePersonalUserPromptForPeriod(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        string $periodType,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $attachedChartPayload,
+        array $periodContext,
+    ): string {
+        $prompt = $this->userUserPrompt($setting, $locale, $chartPayload, $scoreContext, $attachedChartPayload);
+
+        if ($periodContext === []) {
+            return $prompt;
+        }
+
+        return $this->appendPeriodContext($prompt, $locale, $periodType, $periodContext);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $partnershipContext
+     */
+    public function horoscopePartnershipUserPrompt(
+        string $locale,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $partnershipContext = null,
+    ): string {
+        return $this->horoscopePartnershipUserPromptForPeriod(
+            $locale,
+            HoroscopePeriod::DAILY,
+            $chartPayload,
+            $scoreContext,
+            $partnershipContext,
+            [],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $partnershipContext
+     * @param  array<string, mixed>  $periodContext
+     */
+    public function horoscopePartnershipUserPromptForPeriod(
+        string $locale,
+        string $periodType,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $partnershipContext,
+        array $periodContext,
+    ): string {
+        $template = trim((string) __('daily.horoscope_partnership_user_prompt', [], $locale));
+        $prompt = $this->assembleUserPrompt($locale, $template, $chartPayload, $scoreContext, null);
+
+        if ($partnershipContext !== null && $partnershipContext !== []) {
+            $partnershipJson = $this->encodeJson($partnershipContext);
+            $label = $locale === 'hu'
+                ? 'Párkapcsolati képletek és szinasztria (JSON, automatikusan csatolva):'
+                : 'Partnership charts and synastry (JSON, appended automatically):';
+
+            $prompt = rtrim($prompt)."\n\n".$label."\n".$partnershipJson;
+        }
+
+        if ($periodContext === []) {
+            return $prompt;
+        }
+
+        return $this->appendPeriodContext($prompt, $locale, $periodType, $periodContext);
+    }
+
+    public function horoscopePersonalExplanationSystemPrompt(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        string $periodType = HoroscopePeriod::DAILY,
+    ): string {
+        return $this->horoscopePersonalSystemPromptForPeriod($setting, $locale, $periodType)
+            ."\n\n"
+            .__('daily.horoscope_explanation_output_format', [], $locale)
+            ."\n\n"
+            .__('daily.horoscope_personal_explanation_instructions', [], $locale);
+    }
+
+    public function horoscopePartnershipExplanationSystemPrompt(
+        string $locale,
+        string $periodType = HoroscopePeriod::DAILY,
+    ): string {
+        return $this->horoscopePartnershipSystemPromptForPeriod($locale, $periodType)
+            ."\n\n"
+            .__('daily.horoscope_explanation_output_format', [], $locale)
+            ."\n\n"
+            .__('daily.horoscope_partnership_explanation_instructions', [], $locale);
+    }
+
+    public function horoscopePersonalExplanationUserPrompt(HoroscopeDailyMessage $message, string $locale): string
+    {
+        $blocks = [
+            __('daily.horoscope_explanation_user_intro', [], $locale),
+            __('daily.horoscope_explanation_message_label', [], $locale)."\n".$this->encodeJson([
+                'period_type' => $message->period_type,
+                'period_start' => $message->period_start?->toDateString(),
+                'period_end' => $message->period_end?->toDateString(),
+                'motto' => $message->motto,
+                'summary' => $message->summary,
+                'health' => $message->health,
+                'money' => $message->money,
+                'relationships' => $message->relationships,
+                'work' => $message->work,
+            ]),
+        ];
+
+        if (is_array($message->context_payload) && $message->context_payload !== []) {
+            $blocks[] = __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson($message->context_payload);
+        }
+
+        if (is_array($message->period_context) && $message->period_context !== []) {
+            $blocks[] = $this->periodContextLabel($locale)."\n".$this->encodeJson($message->period_context);
+        }
+
+        return implode("\n\n", $blocks);
+    }
+
+    public function horoscopePartnershipExplanationUserPrompt(HoroscopeDailyMessage $message, string $locale): string
+    {
+        return $this->horoscopePersonalExplanationUserPrompt($message, $locale)
+            ."\n\n"
+            .__('daily.horoscope_partnership_explanation_user_append', [], $locale);
+    }
+
+    public function horoscopePersonalProfileExplanationSystemPrompt(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+    ): string {
+        return $this->horoscopePersonalSystemPrompt($setting, $locale)
+            ."\n\n"
+            .__('daily.horoscope_profile_explanation_output_format', [], $locale)
+            ."\n\n"
+            .__('daily.horoscope_personal_profile_explanation_instructions', [], $locale);
+    }
+
+    public function horoscopePartnershipProfileExplanationSystemPrompt(string $locale): string
+    {
+        return $this->horoscopePartnershipSystemPrompt($locale)
+            ."\n\n"
+            .__('daily.horoscope_profile_explanation_output_format', [], $locale)
+            ."\n\n"
+            .__('daily.horoscope_partnership_profile_explanation_instructions', [], $locale);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attachedPayload
+     */
+    public function horoscopePersonalProfileExplanationUserPrompt(array $attachedPayload, string $locale): string
+    {
+        $attachedForLlm = $this->llmContext->buildAttachedContext($attachedPayload, $locale);
+
+        return implode("\n\n", [
+            __('daily.horoscope_personal_profile_explanation_user_intro', [], $locale),
+            __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson($attachedForLlm),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attachedA
+     * @param  array<string, mixed>  $attachedB
+     * @param  array<string, mixed>  $partnershipContext
+     */
+    public function horoscopePartnershipProfileExplanationUserPrompt(
+        array $attachedA,
+        array $attachedB,
+        array $partnershipContext,
+        string $locale,
+    ): string {
+        return implode("\n\n", [
+            __('daily.horoscope_partnership_profile_explanation_user_intro', [], $locale),
+            __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson([
+                'chart_a' => $this->llmContext->buildAttachedContext($attachedA, $locale),
+                'chart_b' => $this->llmContext->buildAttachedContext($attachedB, $locale),
+                'partnership' => $partnershipContext,
+            ]),
+            __('daily.horoscope_partnership_explanation_user_append', [], $locale),
+        ]);
     }
 
     /**

@@ -9,10 +9,13 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatThreadController;
 use App\Http\Controllers\HoroscopeController;
 use App\Http\Controllers\HoroscopeToolsController;
+use App\Http\Controllers\Admin\AdminAstrologyEntryController;
 use App\Http\Controllers\Admin\AdminConversationController;
 use App\Http\Controllers\Admin\AdminDailyHoroscopeController;
+use App\Http\Controllers\Admin\AdminPageVisitController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminVisitorController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
@@ -51,6 +54,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/geocode', [HoroscopeController::class, 'geocode'])->name('horoscope.geocode');
     Route::post('/api/horoscope/calc', [HoroscopeController::class, 'calculate'])->name('horoscope.calculate');
     Route::post('/api/horoscope/info', [HoroscopeController::class, 'elementInfo'])->name('horoscope.info');
+    Route::post('/api/horoscope/aspect-info', [HoroscopeController::class, 'aspectInfo'])->name('horoscope.aspect-info');
+    Route::post('/api/horoscope/daily-message', [HoroscopeController::class, 'dailyMessage'])->name('horoscope.daily-message');
+    Route::post('/api/horoscope/daily-message/explanation', [HoroscopeController::class, 'dailyMessageExplanation'])->name('horoscope.daily-message.explanation');
     Route::post('/api/horoscope/chat', [HoroscopeController::class, 'chat'])->name('horoscope.chat');
 
     Route::post('/api/tools/transit/now', [HoroscopeToolsController::class, 'transitNow'])->name('tools.transit.now');
@@ -62,11 +68,19 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/visitors/{visitor}/ban', [AdminVisitorController::class, 'ban'])->name('visitors.ban');
     Route::patch('/visitors/{visitor}/unban', [AdminVisitorController::class, 'unban'])->name('visitors.unban');
 
+    Route::get('/page-visits', [AdminPageVisitController::class, 'logs'])->name('page-visits.logs');
+    Route::get('/page-visits/summary', [AdminPageVisitController::class, 'summary'])->name('page-visits.summary');
+    Route::put('/page-visits/settings', [AdminPageVisitController::class, 'updateSettings'])->name('page-visits.settings.update');
+
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [AdminUserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
 
     Route::get('/conversations', [AdminConversationController::class, 'index'])->name('conversations.index');
+    Route::get('/conversations/{conversation}', [AdminConversationController::class, 'show'])->name('conversations.show');
+
+    Route::get('/astrology-entries', [AdminAstrologyEntryController::class, 'index'])->name('astrology-entries.index');
+    Route::get('/astrology-entries/{astrologyEntry}', [AdminAstrologyEntryController::class, 'show'])->name('astrology-entries.show');
 
     Route::get('/daily-horoscope', [AdminDailyHoroscopeController::class, 'edit'])->name('daily-horoscope.edit');
     Route::put('/daily-horoscope/system', [AdminDailyHoroscopeController::class, 'updateSystem'])->name('daily-horoscope.system.update');

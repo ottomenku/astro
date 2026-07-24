@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HoroscopeChartExplanation;
+use App\Models\HoroscopeDailyMessage;
+use App\Services\AspectInterpretationService;
 use App\Services\AstrologyChartScoringService;
 use App\Services\AstrologyKnowledgeService;
 use App\Services\ChatPrompts;
 use App\Services\ChatService;
+use App\Services\DailyHoroscopeService;
+use App\Support\HoroscopePeriod;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +38,7 @@ class HoroscopeController extends Controller
                 'lat' => $chart->birth_lat,
                 'lon' => $chart->birth_lon,
                 'is_default' => $chart->is_default,
+                'gender' => $chart->gender,
             ])->values(),
         ]);
     }
@@ -101,9 +108,257 @@ class HoroscopeController extends Controller
             Log::error('Horoscope element info failed', ['error' => $error->getMessage()]);
 
             return response()->json([
-                'error' => $error->getMessage() ?: 'Az elem leírása nem érhető el.',
+                'error' => $this->jsonErrorMessage($error, 'Az elem leírása nem érhető el.'),
             ], 500);
         }
+    }
+
+    public function aspectInfo(Request $request)
+    {
+        $validated = $request->validate([
+            'mode' => ['required', 'string', 'in:natal,transit,synastry'],
+            'aspect' => ['required', 'string', 'max:32'],
+            'body1' => ['required', 'array'],
+            'body1.name' => ['required', 'string', 'max:64'],
+            'body1.sign' => ['nullable', 'string', 'max:32'],
+            'body1.house' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'body1.sign_degree' => ['nullable', 'numeric'],
+            'body1.owner' => ['nullable', 'string', 'max:32'],
+            'body1.gender' => ['nullable', 'string', 'in:male,female'],
+            'body1.retrograde' => ['nullable', 'boolean'],
+            'body2' => ['required', 'array'],
+            'body2.name' => ['required', 'string', 'max:64'],
+            'body2.sign' => ['nullable', 'string', 'max:32'],
+            'body2.house' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'body2.sign_degree' => ['nullable', 'numeric'],
+            'body2.owner' => ['nullable', 'string', 'max:32'],
+            'body2.gender' => ['nullable', 'string', 'in:male,female'],
+            'body2.retrograde' => ['nullable', 'boolean'],
+            'meta' => ['nullable', 'array'],
+            'meta.chart_a_id' => ['nullable', 'integer'],
+            'meta.chart_b_id' => ['nullable', 'integer'],
+            'meta.side_a_is_now' => ['nullable', 'boolean'],
+            'meta.side_b_is_now' => ['nullable', 'boolean'],
+        ]);
+
+        try {
+            $result = app(AspectInterpretationService::class)->resolve(
+                $request->user(),
+                $validated,
+                app()->getLocale(),
+            );
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $error) {
+            return response()->json([
+                'error' => $error->getMessage(),
+            ], 422);
+        } catch (\Throwable $error) {
+            Log::error('Horoscope aspect info failed', ['error' => $error->getMessage()]);
+
+            return response()->json([
+                'error' => $this->jsonErrorMessage($error, 'A fényszög leírása nem érhető el.'),
+            ], 500);
+        }
+    }
+
+    public function dailyMessage(Request $request)
+    {
+        $validated = $request->validate([
+            'mode' => ['required', 'string', 'in:single,dual'],
+            'period' => ['nullable', 'string', 'in:daily,weekly,monthly'],
+            'birth_chart_id' => ['nullable', 'integer'],
+            'birth_chart_id_a' => ['nullable', 'integer'],
+            'birth_chart_id_b' => ['nullable', 'integer'],
+        ]);
+
+        try {
+            $service = app(DailyHoroscopeService::class);
+            $locale = app()->getLocale();
+            $period = HoroscopePeriod::normalize($validated['period'] ?? null);
+
+            if ($validated['mode'] === 'single') {
+                if (empty($validated['birth_chart_id'])) {
+                    return response()->json([
+                        'error' => __('horoscope.daily_select_birth_chart'),
+                    ], 422);
+                }
+
+                $message = $service->personalForBirthChart(
+                    $request->user(),
+                    (int) $validated['birth_chart_id'],
+                    $locale,
+                    $period,
+                );
+            } else {
+                if (empty($validated['birth_chart_id_a']) || empty($validated['birth_chart_id_b'])) {
+                    return response()->json([
+                        'error' => __('horoscope.daily_select_two_birth_charts'),
+                    ], 422);
+                }
+
+                $message = $service->partnershipForBirthCharts(
+                    $request->user(),
+                    (int) $validated['birth_chart_id_a'],
+                    (int) $validated['birth_chart_id_b'],
+                    $locale,
+                    $period,
+                );
+            }
+
+            return response()->json($this->horoscopeMessageJson($message));
+        } catch (\InvalidArgumentException $error) {
+            return response()->json([
+                'error' => $error->getMessage(),
+            ], 422);
+        } catch (\Throwable $error) {
+            Log::error('Horoscope daily message failed', ['error' => $error->getMessage()]);
+
+            return response()->json([
+                'error' => $this->jsonErrorMessage($error, __('horoscope.daily_error')),
+            ], 500);
+        }
+    }
+
+    public function dailyMessageExplanation(Request $request)
+    {
+        $validated = $request->validate([
+            'mode' => ['required', 'string', 'in:single,dual'],
+            'birth_chart_id' => ['nullable', 'integer'],
+            'birth_chart_id_a' => ['nullable', 'integer'],
+            'birth_chart_id_b' => ['nullable', 'integer'],
+            'is_now' => ['nullable', 'boolean'],
+            'chart' => ['nullable', 'array'],
+            'chart.datetime_utc' => ['required_with:is_now', 'date'],
+            'chart.lat' => ['required_with:is_now', 'numeric', 'between:-90,90'],
+            'chart.lon' => ['required_with:is_now', 'numeric', 'between:-180,180'],
+        ]);
+
+        try {
+            $service = app(DailyHoroscopeService::class);
+            $locale = app()->getLocale();
+
+            if ($validated['mode'] === 'single') {
+                if (! empty($validated['is_now'])) {
+                    $explanation = $service->personalNowChartExplanation(
+                        $request->user(),
+                        (string) $validated['chart']['datetime_utc'],
+                        (float) $validated['chart']['lat'],
+                        (float) $validated['chart']['lon'],
+                        $locale,
+                    );
+                } elseif (! empty($validated['birth_chart_id'])) {
+                    $explanation = $service->personalChartExplanation(
+                        $request->user(),
+                        (int) $validated['birth_chart_id'],
+                        $locale,
+                    );
+                } else {
+                    return response()->json([
+                        'error' => __('horoscope.daily_select_birth_chart'),
+                    ], 422);
+                }
+            } else {
+                if (empty($validated['birth_chart_id_a']) || empty($validated['birth_chart_id_b'])) {
+                    return response()->json([
+                        'error' => __('horoscope.daily_select_two_birth_charts'),
+                    ], 422);
+                }
+
+                $explanation = $service->partnershipChartExplanation(
+                    $request->user(),
+                    (int) $validated['birth_chart_id_a'],
+                    (int) $validated['birth_chart_id_b'],
+                    $locale,
+                );
+            }
+
+            return response()->json($this->horoscopeExplanationJson($explanation));
+        } catch (\InvalidArgumentException $error) {
+            return response()->json([
+                'error' => $error->getMessage(),
+            ], 422);
+        } catch (\Throwable $error) {
+            Log::error('Horoscope message explanation failed', ['error' => $error->getMessage()]);
+
+            return response()->json([
+                'error' => $this->jsonErrorMessage($error, __('horoscope.explanation_error')),
+            ], 500);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function horoscopeExplanationJson(HoroscopeChartExplanation $explanation): array
+    {
+        $explanation->load(['birthChart', 'birthChartA', 'birthChartB']);
+
+        if ($explanation->kind === HoroscopeChartExplanation::KIND_PARTNERSHIP) {
+            $chartMeta = __('horoscope.explanation_partnership_meta', [
+                'name_a' => $explanation->birthChartA?->name ?? 'A',
+                'name_b' => $explanation->birthChartB?->name ?? 'B',
+            ]);
+        } elseif ($explanation->birthChart) {
+            $chartMeta = __('horoscope.explanation_personal_meta', [
+                'name' => $explanation->birthChart->name,
+            ]);
+        } else {
+            $datetimeUtc = data_get($explanation->context_payload, 'datetime_utc');
+            $formatted = $datetimeUtc
+                ? \Illuminate\Support\Carbon::parse($datetimeUtc)->timezone(config('app.timezone', 'Europe/Budapest'))->format('Y.m.d H:i')
+                : __('horoscope.now');
+            $chartMeta = __('horoscope.explanation_now_meta', [
+                'datetime' => $formatted,
+            ]);
+        }
+
+        return [
+            'kind' => $explanation->kind,
+            'badge' => $explanation->kind === HoroscopeChartExplanation::KIND_PARTNERSHIP
+                ? __('daily.horoscope_partnership_chart_badge')
+                : __('daily.horoscope_birth_chart_badge'),
+            'chart_meta' => $chartMeta,
+            'explanation' => $explanation->explanation,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function horoscopeMessageJson(HoroscopeDailyMessage $message): array
+    {
+        $period = HoroscopePeriod::normalize($message->period_type);
+        $periodStart = $message->period_start ?? $message->forecast_date;
+        $periodEnd = $message->period_end ?? $message->forecast_date;
+
+        return [
+            'id' => $message->id,
+            'kind' => $message->kind,
+            'period' => $period,
+            'badge' => $message->kind === HoroscopeDailyMessage::KIND_PARTNERSHIP
+                ? __('daily.horoscope_partnership_badge')
+                : __('daily.horoscope_personal_badge'),
+            'forecast_date' => $message->forecast_date->format('Y.m.d'),
+            'chart_meta' => $period === HoroscopePeriod::DAILY
+                ? __('daily.chart_meta', [
+                    'place' => config('daily_horoscope.location.label'),
+                    'date' => $periodStart->format('Y.m.d'),
+                ])
+                : __('daily.period_meta', [
+                    'place' => config('daily_horoscope.location.label'),
+                    'start' => $periodStart->format('Y.m.d'),
+                    'end' => $periodEnd->format('Y.m.d'),
+                ]),
+            'summary_title' => __('daily.summary_title_'.$period),
+            'motto' => $message->motto,
+            'summary' => $message->summary,
+            'health' => $message->health,
+            'money' => $message->money,
+            'relationships' => $message->relationships,
+            'work' => $message->work,
+            'has_explanation' => trim((string) ($message->explanation ?? '')) !== '',
+        ];
     }
 
     public function chat(Request $request)
@@ -198,5 +453,25 @@ class HoroscopeController extends Controller
                 'details' => trim($error->getMessage()) ?: null,
             ], 500);
         }
+    }
+
+    private function jsonErrorMessage(\Throwable $error, string $fallback): string
+    {
+        if ($error instanceof QueryException) {
+            $details = $error->getMessage();
+            if (str_contains($details, 'horoscope_daily_messages')
+                || str_contains($details, 'period_type')
+                || str_contains($details, 'period_start')) {
+                Log::error('Horoscope schema mismatch', ['error' => $details]);
+
+                return __('horoscope.schema_outdated');
+            }
+
+            return $fallback;
+        }
+
+        $message = trim($error->getMessage());
+
+        return $message !== '' ? $message : $fallback;
     }
 }

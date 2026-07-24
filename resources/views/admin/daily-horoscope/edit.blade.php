@@ -229,18 +229,33 @@
                     $score = $scores[$profile->id] ?? [];
                     $isSelected = (int) $setting->scoring_profile_id === (int) $profile->id;
                 @endphp
-                <div x-show="tab === '{{ $scoreTab }}'" x-cloak>
+                <div x-show="tab === '{{ $scoreTab }}'" x-cloak x-data="{ showRawJson: false }">
                     <div class="bg-white shadow-sm sm:rounded-lg border {{ $isSelected ? 'border-indigo-400 ring-1 ring-indigo-200' : 'border-gray-200' }}">
                         <div class="px-4 py-3 bg-gray-50 border-b flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <span class="font-medium">{{ $profile->name }}</span>
                                 <span class="text-xs text-gray-500 ml-2">{{ $profile->engine }}</span>
                             </div>
-                            @if ($isSelected)
-                                <span class="text-xs font-semibold text-indigo-600">Aktív az LM-nél</span>
-                            @endif
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if ($isSelected)
+                                    <span class="text-xs font-semibold text-indigo-600">Aktív az LM-nél</span>
+                                @endif
+                                <button type="button"
+                                        @click="showRawJson = !showRawJson"
+                                        class="inline-flex items-center px-2.5 py-1 rounded border border-gray-300 bg-white text-xs text-gray-700 hover:bg-gray-50"
+                                        x-text="showRawJson ? 'Strukturált nézet' : 'Nyers JSON'">
+                                </button>
+                            </div>
                         </div>
-                        <pre class="p-4 text-xs overflow-x-auto max-h-[36rem] overflow-y-auto whitespace-pre-wrap">{{ json_encode($score, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) }}</pre>
+                        <div x-show="!showRawJson">
+                            @include('admin.daily-horoscope.partials.score-breakdown', [
+                                'score' => $score,
+                                'profile' => $profile,
+                            ])
+                        </div>
+                        <div x-show="showRawJson" x-cloak class="p-4">
+                            <pre class="p-4 bg-gray-50 border border-gray-200 rounded text-xs overflow-x-auto max-h-[36rem] overflow-y-auto whitespace-pre-wrap">{{ json_encode($score, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) }}</pre>
+                        </div>
                     </div>
                 </div>
             @endforeach

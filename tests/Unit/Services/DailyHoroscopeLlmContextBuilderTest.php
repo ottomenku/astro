@@ -45,7 +45,23 @@ class DailyHoroscopeLlmContextBuilderTest extends TestCase
         $this->assertSame('Kos', $context['significant_placements'][0]['sign']);
     }
 
-    public function test_aspects_are_ranked_with_signs_and_fixed_stars(): void
+    public function test_chart_context_includes_retrograde_flag(): void
+    {
+        $payload = [
+            'transit' => [
+                'planets' => [
+                    ['name' => 'Mars', 'sign' => 'Aries', 'sign_degree' => 10.0, 'longitude' => 10.0, 'house' => 1, 'retrograde' => true],
+                ],
+                'fixed_stars' => [],
+            ],
+        ];
+
+        $context = $this->builder->buildChartContext($payload, 'hu');
+
+        $this->assertSame(true, $context['significant_placements'][0]['retrograde'] ?? null);
+    }
+
+    public function test_aspect_signals_include_ranked_pairwise_star_conjunctions_and_summary(): void
     {
         $payload = [
             'transit' => [
@@ -62,19 +78,33 @@ class DailyHoroscopeLlmContextBuilderTest extends TestCase
 
         $context = $this->builder->buildChartContext($payload, 'hu');
 
-        $this->assertNotEmpty($context['aspects']);
+        $this->assertArrayHasKey('aspect_signals', $context);
+        $signals = $context['aspect_signals'];
 
-        $opposition = collect($context['aspects'])->first(fn (array $aspect) => ($aspect['type_key'] ?? '') === 'opposition');
+        $this->assertArrayHasKey('participation_summary', $signals);
+        $this->assertArrayHasKey('dominant', $signals['participation_summary']);
+        $this->assertArrayHasKey('polarity', $signals['participation_summary']);
+        $this->assertArrayHasKey('elements', $signals['participation_summary']);
+        $this->assertArrayHasKey('modalities', $signals['participation_summary']);
+
+        $this->assertNotEmpty($signals['pairwise']);
+
+        $opposition = collect($signals['pairwise'])->first(fn (array $aspect) => ($aspect['type_key'] ?? '') === 'opposition');
         $this->assertNotNull($opposition);
         $this->assertStringContainsString('Merkúr', (string) $opposition['description']);
         $this->assertStringContainsString('Mérleg', (string) $opposition['body1']['sign']);
         $this->assertStringContainsString('Kos', (string) $opposition['body2']['sign']);
         $this->assertSame(4, $opposition['priority']);
 
-        $starAspect = collect($context['aspects'])->first(fn (array $aspect) => ($aspect['type_key'] ?? '') === 'conjunction'
+        $starAspect = collect($signals['pairwise'])->first(fn (array $aspect) => ($aspect['type_key'] ?? '') === 'conjunction'
             && (($aspect['body2']['kind'] ?? '') === 'fixed_star' || ($aspect['body1']['kind'] ?? '') === 'fixed_star'));
         $this->assertNotNull($starAspect);
         $this->assertStringContainsString('Regulus', (string) $starAspect['description']);
+
+        $venusAnchor = collect($signals['anchor_configurations'])->first(fn (array $config) => ($config['body1'] ?? '') === 'venus');
+        $this->assertNotNull($venusAnchor);
+        $this->assertSame('regulus', $venusAnchor['body2']);
+        $this->assertSame('conjunction', $venusAnchor['type2']);
     }
 
     public function test_score_summary_omits_house_breakdown(): void

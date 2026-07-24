@@ -54,19 +54,25 @@ class DailyHoroscopeLlmContextBuilder
         $fixedStars = $this->normalizeFixedStars((array) ($chart['fixed_stars'] ?? []));
         $bodiesById = $this->indexBodies(array_merge($planets, $fixedStars));
         $planetAspects = $this->detectAspects($planets, $planets);
-        $starAspects = $this->detectAspects($planets, $fixedStars);
-        $allAspects = array_merge($planetAspects, $starAspects);
+        $starConjunctions = $this->detectStarConjunctions($planets, $fixedStars);
         $patterns = $this->detectPatterns($planetAspects, $planets);
-        $rankedAspects = $this->rankAspects($allAspects, $bodiesById, $patterns, $locale);
+        $aspectSignals = $this->buildAspectSignals(
+            $planetAspects,
+            $starConjunctions,
+            $bodiesById,
+            $patterns,
+            $locale,
+        );
 
         return [
             'datetime_utc' => $chart['datetime_utc'] ?? null,
             'significant_placements' => $this->buildSignificantPlacements($planets, $locale),
             'patterns' => $this->translatePatterns($patterns, $locale),
-            'aspects' => $rankedAspects,
+            'aspect_signals' => $aspectSignals,
             'meta' => [
                 'houses_excluded' => true,
                 'placement_rule' => 'domicile, exaltation, or planet in matching element',
+                'fixed_star_aspects' => 'conjunction only',
                 'aspect_priority' => [
                     1 => 'grand pattern (grand trine, grand cross, sextile triangle)',
                     2 => 'both bodies dignified (domicile or exaltation)',
@@ -93,8 +99,54 @@ class DailyHoroscopeLlmContextBuilder
         return [
             'source' => $attachedPayload['source'] ?? null,
             'label' => $attachedPayload['label'] ?? null,
+            'gender' => $attachedPayload['gender'] ?? null,
             'chart' => $this->buildChartContext($chart, $locale),
             'score_summary' => $this->buildScoreSummary($score),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayloadA
+     * @param  array<string, mixed>  $chartPayloadB
+     * @return array<string, mixed>
+     */
+    public function buildSynastryContext(array $chartPayloadA, array $chartPayloadB, string $locale): array
+    {
+        $planetsA = $this->normalizePlanets((array) ($this->resolveDailyChart($chartPayloadA)['planets'] ?? []));
+        $planetsB = $this->normalizePlanets((array) ($this->resolveDailyChart($chartPayloadB)['planets'] ?? []));
+
+        $aspects = $this->detectAspects($planetsA, $planetsB);
+
+        return [
+            'pairwise' => array_map(fn (array $aspect) => [
+                'body1' => $aspect['body1_id'],
+                'body2' => $aspect['body2_id'],
+                'type' => $aspect['type'],
+                'harmonic' => $aspect['harmonic'],
+                'orb' => $aspect['orb'],
+            ], $aspects),
+            'count' => count($aspects),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $chartPayloadA
+     * @param  array<string, mixed>|null  $chartPayloadB
+     * @return array<string, mixed>|null
+     */
+    public function buildPartnershipContext(?array $chartPayloadA, ?array $chartPayloadB, string $locale): ?array
+    {
+        if ($chartPayloadA === null || $chartPayloadB === null) {
+            return null;
+        }
+
+        $chartA = (array) ($chartPayloadA['chart'] ?? []);
+        $chartB = (array) ($chartPayloadB['chart'] ?? []);
+
+        return [
+            'chart_a' => $this->buildAttachedContext($chartPayloadA, $locale),
+            'chart_b' => $this->buildAttachedContext($chartPayloadB, $locale),
+            'synastry' => $this->buildSynastryContext($chartA, $chartB, $locale),
         ];
     }
 
@@ -189,6 +241,7 @@ class DailyHoroscopeLlmContextBuilder
                 'sign' => $sign,
                 'sign_degree' => round((float) ($planet['sign_degree'] ?? 0), 2),
                 'longitude' => (float) ($planet['longitude'] ?? 0),
+                'retrograde' => (bool) ($planet['retrograde'] ?? false),
             ];
         }
 
@@ -267,6 +320,504 @@ class DailyHoroscopeLlmContextBuilder
     }
 
     /**
+     * Állócsillagokkal csak együttállás.
+     *
+     * @param  array<int, array<string, mixed>>  $planets
+     * @param  array<int, array<string, mixed>>  $stars
+     * @return array<int, array<string, mixed>>
+     */
+    private function detectStarConjunctions(array $planets, array $stars): array
+    {
+        $aspects = [];
+
+        foreach ($planets as $planet) {
+            foreach ($stars as $star) {
+                $delta = $this->angleDelta((float) $planet['longitude'], (float) $star['longitude']);
+                $orb = abs($delta - 0.0);
+                if ($orb <= 8.0) {
+                    $aspects[] = [
+                        'body1_id' => $planet['id'],
+                        'body2_id' => $star['id'],
+                        'body1_kind' => 'planet',
+                        'body2_kind' => 'fixed_star',
+                        'type' => 'conjunction',
+                        'angle' => 0,
+                        'orb' => round($orb, 3),
+                        'harmonic' => null,
+                    ];
+                }
+            }
+        }
+
+        return $aspects;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $planetAspects
+     * @param  array<int, array<string, mixed>>  $starConjunctions
+     * @param  array<string, array<string, mixed>>  $bodiesById
+     * @param  array<int, array<string, mixed>>  $patterns
+     * @return array<string, mixed>
+     */
+    private function buildAspectSignals(
+        array $planetAspects,
+        array $starConjunctions,
+        array $bodiesById,
+        array $patterns,
+        string $locale,
+    ): array {
+        $allAspects = array_merge($planetAspects, $starConjunctions);
+        $scoredAspects = $this->scoreAspects($allAspects, $bodiesById, $patterns);
+
+        return [
+            'participation_summary' => $this->buildParticipationSummary($scoredAspects, $bodiesById),
+            'conjunction_groups' => $this->buildConjunctionGroups($scoredAspects, $bodiesById, $locale),
+            'anchor_configurations' => $this->buildAnchorConfigurations($scoredAspects, $bodiesById, $locale),
+            'pairwise' => $this->buildPairwiseAspects($scoredAspects, $bodiesById, $locale),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $aspects
+     * @param  array<string, array<string, mixed>>  $bodiesById
+     * @param  array<int, array<string, mixed>>  $patterns
+     * @return array<int, array<string, mixed>>
+     */
+    private function scoreAspects(array $aspects, array $bodiesById, array $patterns): array
+    {
+        $patternPairs = [];
+        foreach ($patterns as $pattern) {
+            $members = (array) ($pattern['planets'] ?? []);
+            for ($i = 0; $i < count($members); $i++) {
+                for ($j = $i + 1; $j < count($members); $j++) {
+                    $patternPairs[$this->pairKey((string) $members[$i], (string) $members[$j])] = (string) ($pattern['type'] ?? 'pattern');
+                }
+            }
+        }
+
+        $scored = [];
+
+        foreach ($aspects as $aspect) {
+            $body1 = $bodiesById[(string) $aspect['body1_id']] ?? null;
+            $body2 = $bodiesById[(string) $aspect['body2_id']] ?? null;
+            if (! $body1 || ! $body2) {
+                continue;
+            }
+
+            $pairKey = $this->pairKey((string) $body1['id'], (string) $body2['id']);
+            $priority = 4;
+            $priorityReason = 'standard';
+
+            if (isset($patternPairs[$pairKey])) {
+                $priority = 1;
+                $priorityReason = $patternPairs[$pairKey];
+            } else {
+                $body1Dignified = $body1['kind'] === 'planet' && $this->isDignified((string) $body1['name'], (string) $body1['sign']);
+                $body2Dignified = $body2['kind'] === 'planet' && $this->isDignified((string) $body2['name'], (string) $body2['sign']);
+
+                if ($body1Dignified && $body2Dignified) {
+                    $priority = 2;
+                    $priorityReason = 'both_dignified';
+                } elseif ($body1Dignified || $body2Dignified) {
+                    $priority = 3;
+                    $priorityReason = 'one_dignified';
+                }
+            }
+
+            $scored[] = array_merge($aspect, [
+                'body1' => $body1,
+                'body2' => $body2,
+                'priority' => $priority,
+                'priority_reason' => $priorityReason,
+                'weight' => round($this->aspectWeight($priority, (float) $aspect['orb']), 3),
+            ]);
+        }
+
+        return $scored;
+    }
+
+    private function aspectWeight(int $priority, float $orb): float
+    {
+        $priorityWeight = match ($priority) {
+            1 => 1.0,
+            2 => 0.75,
+            3 => 0.5,
+            default => 0.25,
+        };
+        $orbTightness = max(0.25, 1 - min($orb, 8.0) / 8.0);
+
+        return $priorityWeight * $orbTightness;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $scoredAspects
+     * @param  array<string, array<string, mixed>>  $bodiesById
+     * @return array<string, mixed>
+     */
+    private function buildParticipationSummary(array $scoredAspects, array $bodiesById): array
+    {
+        $polarity = ['positive' => 0.0, 'negative' => 0.0];
+        $elements = ['fire' => 0.0, 'earth' => 0.0, 'air' => 0.0, 'water' => 0.0];
+        $modalities = ['cardinal' => 0.0, 'fixed' => 0.0, 'mutable' => 0.0];
+        $counted = [];
+
+        foreach ($scoredAspects as $aspect) {
+            foreach (['body1', 'body2'] as $slot) {
+                $body = $aspect[$slot];
+                $bodyKey = (string) $body['id'];
+                if (isset($counted[$bodyKey])) {
+                    continue;
+                }
+                $counted[$bodyKey] = true;
+
+                $weight = (float) $aspect['weight'];
+                $sign = ZodiacSign::tryFromName((string) $body['sign']);
+                if (! $sign) {
+                    continue;
+                }
+
+                $elements[$sign->element()] += $weight;
+                $modalities[$sign->modality()] += $weight;
+                if ($sign->polarity() === 'positive') {
+                    $polarity['positive'] += $weight;
+                } else {
+                    $polarity['negative'] += $weight;
+                }
+            }
+        }
+
+        foreach ($elements as $key => $value) {
+            $elements[$key] = round($value, 2);
+        }
+        foreach ($modalities as $key => $value) {
+            $modalities[$key] = round($value, 2);
+        }
+        foreach ($polarity as $key => $value) {
+            $polarity[$key] = round($value, 2);
+        }
+
+        return [
+            'polarity' => $polarity,
+            'elements' => $elements,
+            'modalities' => $modalities,
+            'dominant' => [
+                'polarity' => $this->dominantKey($polarity),
+                'element' => $this->dominantKey($elements),
+                'modality' => $this->dominantKey($modalities),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, float>  $values
+     */
+    private function dominantKey(array $values): ?string
+    {
+        if ($values === []) {
+            return null;
+        }
+
+        arsort($values);
+
+        return (string) array_key_first($values);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $scoredAspects
+     * @param  array<string, array<string, mixed>>  $bodiesById
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildConjunctionGroups(array $scoredAspects, array $bodiesById, string $locale): array
+    {
+        $conjunctions = array_values(array_filter(
+            $scoredAspects,
+            fn (array $aspect) => ($aspect['type'] ?? '') === 'conjunction',
+        ));
+
+        if ($conjunctions === []) {
+            return [];
+        }
+
+        $parent = [];
+        foreach ($bodiesById as $id => $_body) {
+            $parent[$id] = $id;
+        }
+
+        $find = function (string $id) use (&$parent, &$find): string {
+            if ($parent[$id] !== $id) {
+                $parent[$id] = $find($parent[$id]);
+            }
+
+            return $parent[$id];
+        };
+
+        $union = function (string $left, string $right) use (&$parent, $find): void {
+            $rootLeft = $find($left);
+            $rootRight = $find($right);
+            if ($rootLeft !== $rootRight) {
+                $parent[$rootRight] = $rootLeft;
+            }
+        };
+
+        foreach ($conjunctions as $aspect) {
+            $union((string) $aspect['body1_id'], (string) $aspect['body2_id']);
+        }
+
+        $groups = [];
+        foreach ($conjunctions as $aspect) {
+            $root = $find((string) $aspect['body1_id']);
+            $groups[$root]['members'][(string) $aspect['body1_id']] = $aspect['body1'];
+            $groups[$root]['members'][(string) $aspect['body2_id']] = $aspect['body2'];
+            $groups[$root]['priority'] = min($groups[$root]['priority'] ?? 99, (int) $aspect['priority']);
+            $groups[$root]['max_orb'] = max($groups[$root]['max_orb'] ?? 0, (float) $aspect['orb']);
+        }
+
+        $result = [];
+        foreach ($groups as $group) {
+            $members = array_values($group['members']);
+            if (count($members) < 2) {
+                continue;
+            }
+
+            $memberLabels = array_map(function (array $body) use ($locale): string {
+                if ($body['kind'] === 'fixed_star') {
+                    return $this->translateFixedStar((string) $body['name'], $locale);
+                }
+
+                return sprintf(
+                    '%s (%s)',
+                    $this->translatePlanet((string) $body['name'], $locale),
+                    $this->translateSign((string) $body['sign'], $locale),
+                );
+            }, $members);
+
+            $result[] = [
+                'priority' => $group['priority'],
+                'member_count' => count($members),
+                'members' => array_map(fn (array $body) => $this->compactBody($body, $locale), $members),
+                'description' => implode(' + ', $memberLabels),
+            ];
+        }
+
+        usort($result, fn (array $a, array $b) => [$a['priority'], -$a['member_count']] <=> [$b['priority'], -$b['member_count']]);
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $scoredAspects
+     * @param  array<string, array<string, mixed>>  $bodiesById
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildAnchorConfigurations(array $scoredAspects, array $bodiesById, string $locale): array
+    {
+        $byAnchor = [];
+
+        foreach ($scoredAspects as $aspect) {
+            if (($aspect['body1_kind'] ?? '') !== 'planet') {
+                continue;
+            }
+
+            $anchorId = (string) $aspect['body1_id'];
+            $byAnchor[$anchorId]['anchor'] = $aspect['body1'];
+            $byAnchor[$anchorId]['relations'][] = [
+                'aspect' => $aspect,
+                'other' => $aspect['body2'],
+                'other_slot' => 'body2',
+            ];
+
+            if (($aspect['body2_kind'] ?? '') === 'planet') {
+                $reverseId = (string) $aspect['body2_id'];
+                $byAnchor[$reverseId]['anchor'] = $aspect['body2'];
+                $byAnchor[$reverseId]['relations'][] = [
+                    'aspect' => $aspect,
+                    'other' => $aspect['body1'],
+                    'other_slot' => 'body1',
+                ];
+            }
+        }
+
+        $configurations = [];
+
+        foreach ($byAnchor as $anchorId => $data) {
+            $relations = (array) ($data['relations'] ?? []);
+            if ($relations === []) {
+                continue;
+            }
+
+            $anchor = (array) $data['anchor'];
+            $priority = min(array_map(fn (array $rel) => (int) $rel['aspect']['priority'], $relations));
+            $formattedRelations = [];
+            $relationIndex = 2;
+            $descriptionParts = [];
+
+            $anchorLabel = sprintf(
+                '%s (%s)',
+                $this->translatePlanet((string) $anchor['name'], $locale),
+                $this->translateSign((string) $anchor['sign'], $locale),
+            );
+
+            usort($relations, function (array $left, array $right): int {
+                if ($left['aspect']['priority'] !== $right['aspect']['priority']) {
+                    return $left['aspect']['priority'] <=> $right['aspect']['priority'];
+                }
+
+                return ($left['aspect']['orb'] ?? 99) <=> ($right['aspect']['orb'] ?? 99);
+            });
+
+            foreach ($relations as $relation) {
+                $aspect = $relation['aspect'];
+                $other = $relation['other'];
+                $slot = $relationIndex;
+
+                $entry = [
+                    'body'.$slot => $this->bodyId((string) $other['name']),
+                    'type'.$slot => (string) $aspect['type'],
+                    'orb'.$slot => $aspect['orb'],
+                    'priority'.$slot => $aspect['priority'],
+                    'kind'.$slot => $other['kind'],
+                ];
+
+                if ($other['kind'] === 'planet') {
+                    $entry['sign'.$slot] = $this->translateSign((string) $other['sign'], $locale);
+                }
+
+                $formattedRelations[] = $entry;
+                $relationIndex++;
+
+                $otherLabel = $other['kind'] === 'fixed_star'
+                    ? $this->translateFixedStar((string) $other['name'], $locale)
+                    : sprintf(
+                        '%s (%s)',
+                        $this->translatePlanet((string) $other['name'], $locale),
+                        $this->translateSign((string) $other['sign'], $locale),
+                    );
+
+                $descriptionParts[] = sprintf(
+                    '%s %s',
+                    $this->translateAspectType((string) $aspect['type'], $locale),
+                    $otherLabel,
+                );
+            }
+
+            $configuration = [
+                'body1' => $this->bodyId((string) $anchor['name']),
+                'sign1' => $this->translateSign((string) $anchor['sign'], $locale),
+                'priority' => $priority,
+                'relation_count' => count($formattedRelations),
+                'description' => $anchorLabel.' — '.implode('; ', $descriptionParts),
+            ];
+
+            foreach ($formattedRelations as $relationEntry) {
+                $configuration = array_merge($configuration, $relationEntry);
+            }
+
+            $configurations[] = $configuration;
+        }
+
+        usort($configurations, function (array $left, array $right): int {
+            if ($left['priority'] !== $right['priority']) {
+                return $left['priority'] <=> $right['priority'];
+            }
+
+            return ($right['relation_count'] ?? 0) <=> ($left['relation_count'] ?? 0);
+        });
+
+        return array_values(array_filter(
+            $configurations,
+            function (array $config): bool {
+                $relationCount = 0;
+                for ($index = 2; $index <= 12; $index++) {
+                    if (isset($config['body'.$index])) {
+                        $relationCount++;
+                    }
+                }
+
+                if ($relationCount >= 2) {
+                    return true;
+                }
+
+                if (($config['priority'] ?? 99) <= 3) {
+                    return true;
+                }
+
+                for ($index = 2; $index <= 12; $index++) {
+                    if (($config['kind'.$index] ?? '') === 'fixed_star') {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+        ));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $scoredAspects
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildPairwiseAspects(array $scoredAspects, array $bodiesById, string $locale): array
+    {
+        $pairwise = [];
+
+        foreach ($scoredAspects as $aspect) {
+            $body1 = $aspect['body1'];
+            $body2 = $aspect['body2'];
+
+            $pairwise[] = [
+                'priority' => $aspect['priority'],
+                'priority_reason' => $aspect['priority_reason'],
+                'type' => $this->translateAspectType((string) $aspect['type'], $locale),
+                'type_key' => $aspect['type'],
+                'orb' => $aspect['orb'],
+                'harmonic' => $aspect['harmonic'],
+                'body1' => $this->compactBody($body1, $locale),
+                'body2' => $this->compactBody($body2, $locale),
+                'description' => $this->aspectDescription($body1, $body2, (string) $aspect['type'], $locale),
+            ];
+        }
+
+        usort($pairwise, function (array $left, array $right): int {
+            if ($left['priority'] !== $right['priority']) {
+                return $left['priority'] <=> $right['priority'];
+            }
+
+            return ($left['orb'] ?? 99) <=> ($right['orb'] ?? 99);
+        });
+
+        return $pairwise;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function compactBody(array $body, string $locale): array
+    {
+        if ($body['kind'] === 'fixed_star') {
+            return [
+                'id' => $this->bodyId((string) $body['name']),
+                'name' => $this->translateFixedStar((string) $body['name'], $locale),
+                'kind' => 'fixed_star',
+                'sign' => $this->translateSign((string) $body['sign'], $locale),
+            ];
+        }
+
+        return [
+            'id' => $this->bodyId((string) $body['name']),
+            'name' => $this->translatePlanet((string) $body['name'], $locale),
+            'kind' => 'planet',
+            'sign' => $this->translateSign((string) $body['sign'], $locale),
+            'retrograde' => (bool) ($body['retrograde'] ?? false),
+        ];
+    }
+
+    private function bodyId(string $name): string
+    {
+        return strtolower(str_replace(' ', '_', $name));
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $planets
      * @return array<int, array<string, mixed>>
      */
@@ -284,6 +835,7 @@ class DailyHoroscopeLlmContextBuilder
                 'planet' => $this->translatePlanet((string) $planet['name'], $locale),
                 'sign' => $this->translateSign((string) $planet['sign'], $locale),
                 'sign_degree' => $planet['sign_degree'],
+                'retrograde' => (bool) ($planet['retrograde'] ?? false),
                 'strength' => $reasons,
             ];
         }
@@ -484,98 +1036,6 @@ class DailyHoroscopeLlmContextBuilder
         }
 
         return $indexed;
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $aspects
-     * @param  array<string, array<string, mixed>>  $bodiesById
-     * @param  array<int, array<string, mixed>>  $patterns
-     * @return array<int, array<string, mixed>>
-     */
-    private function rankAspects(array $aspects, array $bodiesById, array $patterns, string $locale): array
-    {
-        $patternPairs = [];
-        foreach ($patterns as $pattern) {
-            $members = (array) ($pattern['planets'] ?? []);
-            for ($i = 0; $i < count($members); $i++) {
-                for ($j = $i + 1; $j < count($members); $j++) {
-                    $patternPairs[$this->pairKey((string) $members[$i], (string) $members[$j])] = (string) ($pattern['type'] ?? 'pattern');
-                }
-            }
-        }
-
-        $ranked = [];
-
-        foreach ($aspects as $aspect) {
-            $body1 = $bodiesById[(string) $aspect['body1_id']] ?? null;
-            $body2 = $bodiesById[(string) $aspect['body2_id']] ?? null;
-
-            if (! $body1 || ! $body2) {
-                continue;
-            }
-
-            $pairKey = $this->pairKey((string) $body1['id'], (string) $body2['id']);
-            $priority = 4;
-            $priorityReason = 'standard';
-
-            if (isset($patternPairs[$pairKey])) {
-                $priority = 1;
-                $priorityReason = $patternPairs[$pairKey];
-            } else {
-                $body1Dignified = $body1['kind'] === 'planet' && $this->isDignified((string) $body1['name'], (string) $body1['sign']);
-                $body2Dignified = $body2['kind'] === 'planet' && $this->isDignified((string) $body2['name'], (string) $body2['sign']);
-
-                if ($body1Dignified && $body2Dignified) {
-                    $priority = 2;
-                    $priorityReason = 'both_dignified';
-                } elseif ($body1Dignified || $body2Dignified) {
-                    $priority = 3;
-                    $priorityReason = 'one_dignified';
-                }
-            }
-
-            $ranked[] = [
-                'priority' => $priority,
-                'priority_reason' => $priorityReason,
-                'type' => $this->translateAspectType((string) $aspect['type'], $locale),
-                'type_key' => $aspect['type'],
-                'orb' => $aspect['orb'],
-                'harmonic' => $aspect['harmonic'],
-                'description' => $this->aspectDescription($body1, $body2, (string) $aspect['type'], $locale),
-                'body1' => $this->bodyLabel($body1, $locale),
-                'body2' => $this->bodyLabel($body2, $locale),
-            ];
-        }
-
-        usort($ranked, function (array $left, array $right): int {
-            if ($left['priority'] !== $right['priority']) {
-                return $left['priority'] <=> $right['priority'];
-            }
-
-            return ($left['orb'] ?? 99) <=> ($right['orb'] ?? 99);
-        });
-
-        return $ranked;
-    }
-
-    /**
-     * @param  array<string, mixed>  $body
-     * @return array<string, mixed>
-     */
-    private function bodyLabel(array $body, string $locale): array
-    {
-        if ($body['kind'] === 'fixed_star') {
-            return [
-                'name' => $this->translateFixedStar((string) $body['name'], $locale),
-                'kind' => 'fixed_star',
-            ];
-        }
-
-        return [
-            'name' => $this->translatePlanet((string) $body['name'], $locale),
-            'sign' => $this->translateSign((string) $body['sign'], $locale),
-            'kind' => 'planet',
-        ];
     }
 
     /**

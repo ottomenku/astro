@@ -21,6 +21,8 @@ PLANETS = [
     (swe.TRUE_NODE, "True Node"),
 ]
 
+NEVER_RETROGRADE = {"Sun", "Moon"}
+
 SIGNS = [
     "Aries",
     "Taurus",
@@ -93,17 +95,20 @@ def whole_sign_houses(asc: float) -> list[float]:
 
 def calc_planets(jd: float, ayanamsa: float) -> list[dict]:
     results = []
-    flags = swe.FLG_SWIEPH | swe.FLG_MOSEPH
+    flags = swe.FLG_SWIEPH | swe.FLG_MOSEPH | swe.FLG_SPEED
     for planet_id, name in PLANETS:
-        lon, lat, dist = swe.calc_ut(jd, planet_id, flags)[0][:3]
+        values = swe.calc_ut(jd, planet_id, flags)[0]
+        lon, lat, dist, speed_lon = values[:4]
         lon = normalize_degree(lon - ayanamsa)
         sign_name, sign_deg = zodiac_sign(lon)
+        retrograde = name not in NEVER_RETROGRADE and speed_lon < 0
         results.append(
             {
                 "name": name,
                 "longitude": lon,
                 "sign": sign_name,
                 "sign_degree": sign_deg,
+                "retrograde": retrograde,
             }
         )
     return results

@@ -14,9 +14,13 @@ class DailyHoroscopeMessage extends Model
     protected $fillable = [
         'forecast_date',
         'locale',
+        'period_type',
+        'period_start',
+        'period_end',
         'status',
         'chart_datetime_utc',
         'chart_payload',
+        'period_context',
         'score_payload',
         'scoring_profile_name',
         'motto',
@@ -33,8 +37,11 @@ class DailyHoroscopeMessage extends Model
 
     protected $casts = [
         'forecast_date' => 'date',
+        'period_start' => 'date',
+        'period_end' => 'date',
         'chart_datetime_utc' => 'datetime',
         'chart_payload' => 'array',
+        'period_context' => 'array',
         'score_payload' => 'array',
         'generated_at' => 'datetime',
         'published_at' => 'datetime',

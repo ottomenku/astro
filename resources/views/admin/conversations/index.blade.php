@@ -14,7 +14,9 @@
                                     <th class="py-2 pr-4">Model</th>
                                     <th class="py-2 pr-4">Prompt</th>
                                     <th class="py-2 pr-4">Válasz</th>
+                                    <th class="py-2 pr-4">Token</th>
                                     <th class="py-2 pr-4">Idő</th>
+                                    <th class="py-2 pr-4"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -35,7 +37,17 @@
                                         <td class="py-2 pr-4 max-w-xs">
                                             <div class="whitespace-pre-wrap break-words">{{ \Illuminate\Support\Str::limit($c->response, 300) }}</div>
                                         </td>
-                                        <td class="py-2 pr-4">{{ $c->created_at }}</td>
+                                        <td class="py-2 pr-4 whitespace-nowrap">
+                                            @if ($c->totalTokens() !== null)
+                                                {{ number_format($c->totalTokens(), 0, ',', ' ') }}
+                                            @else
+                                                <span class="text-gray-400">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 pr-4 whitespace-nowrap">{{ $c->created_at?->format('Y-m-d H:i') }}</td>
+                                        <td class="py-2 pr-4 text-right">
+                                            <a href="{{ route('admin.conversations.show', $c) }}" class="text-indigo-700 underline">Részletek</a>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>

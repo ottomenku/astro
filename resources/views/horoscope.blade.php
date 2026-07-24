@@ -14,56 +14,33 @@
             <div class="bg-white shadow-sm rounded-lg">
                 <div class="p-6">
                     @include('partials.app-icon-toolbar')
-
-                    <div class="flex flex-wrap gap-2 mt-2">
-                        <button
-                            type="button"
-                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
-                            data-tab="chart"
-                            id="tabChart"
-                            title="{{ __('horoscope.chart_tab') }}"
-                            aria-label="{{ __('horoscope.chart_tab') }}"
-                        >
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <circle cx="12" cy="12" r="9" />
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M12 3v18M3 12h18" />
-                            </svg>
-                        </button>
-                        <button
-                            type="button"
-                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
-                            data-tab="tables"
-                            id="tabTables"
-                            title="{{ __('horoscope.tables_tab') }}"
-                            aria-label="{{ __('horoscope.tables_tab') }}"
-                        >
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-                            </svg>
-                        </button>
-                        <button
-                            type="button"
-                            class="px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center"
-                            data-tab="dual"
-                            id="tabDual"
-                            title="{{ __('horoscope.dual_tab') }}"
-                            aria-label="{{ __('horoscope.dual_tab') }}"
-                        >
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <circle cx="8.5" cy="12" r="5.5" />
-                                <circle cx="15.5" cy="12" r="5.5" />
-                                <path d="M8.5 6.5v11M2.5 12h12" opacity="0.85" />
-                                <path d="M15.5 6.5v11M9.5 12h12" opacity="0.85" />
-                            </svg>
-                        </button>
-                    </div>
+                    @include('partials.horoscope-subnav')
 
                     <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>
                     <div id="selectionBox" class="hidden mt-3 max-w-xl mx-auto text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-2"></div>
 
-                    <div class="mt-4" id="panelChart">
+                    @php
+                        $horoscopePageMode = request()->query('mode') === 'dual' ? 'dual' : 'single';
+                        $horoscopePageView = request()->query('view', 'chart');
+                        $defaultSingleChart = $birthCharts->firstWhere('is_default', true) ?? $birthCharts->first();
+                    @endphp
+
+                    @if ($horoscopePageMode === 'single')
+                        <div class="mt-4 max-w-xl mx-auto" id="singleChartSourceBar">
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5" for="birthChartSelect">{{ __('horoscope.explanation_chart_select') }}</label>
+                            <select id="birthChartSelect" class="w-full px-3 py-2 rounded border border-gray-300 text-sm bg-white" aria-label="{{ __('horoscope.explanation_chart_select') }}">
+                                <option value="now" @selected(! $defaultSingleChart)>{{ __('horoscope.now') }}</option>
+                                @foreach ($birthCharts as $chart)
+                                    @php $parts = $chart->localBirthParts(); @endphp
+                                    <option value="{{ $chart->id }}" @selected($defaultSingleChart && $defaultSingleChart->id === $chart->id)>
+                                        {{ $chart->name }} — {{ $parts['date'] }} {{ $parts['time'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+
+                    <div class="mt-4 {{ $horoscopePageMode === 'single' && $horoscopePageView === 'chart' ? '' : 'hidden' }}" id="panelChart">
                         <div class="max-w-xl mx-auto flex items-center justify-between gap-3 mb-3">
                             <h3 class="font-semibold">{{ __('horoscope.chart_heading') }}</h3>
                             <button
@@ -172,19 +149,6 @@
                                                 <input class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" type="time" id="natalTime" step="60">
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div class="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-200">
-                                        <button class="px-3 py-1.5 rounded border border-gray-300" type="button" id="setNow">{{ __('horoscope.now') }}</button>
-                                        <select id="birthChartSelect" class="px-3 py-1.5 rounded border border-gray-300 text-sm max-w-xs min-w-[10rem]" aria-label="{{ __('horoscope.birth_time') }}">
-                                            <option value="">{{ __('horoscope.birth_chart_select') }}</option>
-                                            @foreach ($birthCharts as $chart)
-                                                @php $parts = $chart->localBirthParts(); @endphp
-                                                <option value="{{ $chart->id }}" @selected($chart->is_default)>
-                                                    {{ $chart->name }} — {{ $parts['date'] }} {{ $parts['time'] }}
-                                                </option>
-                                            @endforeach
-                                        </select>
                                     </div>
 
                                     <div>
@@ -315,7 +279,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 hidden" id="panelDual">
+                    <div class="mt-4 {{ $horoscopePageMode === 'dual' && $horoscopePageView === 'chart' ? '' : 'hidden' }}" id="panelDual">
                         <div class="max-w-xl mx-auto mb-3">
                             <h3 class="font-semibold">{{ __('horoscope.dual_heading') }}</h3>
                             <p class="text-xs text-gray-500 mt-1">{{ __('horoscope.dual_hint') }}</p>
@@ -368,7 +332,7 @@
                                 </div>
                                 <select id="dualBirthChartSelectB" class="w-full px-3 py-1.5 rounded border border-red-200 text-sm bg-white" aria-label="{{ __('horoscope.dual_load_b') }}">
                                     <option value="">{{ __('horoscope.birth_chart_select') }}</option>
-                                    <option value="now">{{ __('horoscope.now') }}</option>
+                                    <option value="now" @selected(true)>{{ __('horoscope.now') }}</option>
                                     @foreach ($birthCharts as $chart)
                                         @php $parts = $chart->localBirthParts(); @endphp
                                         <option value="{{ $chart->id }}">
@@ -384,21 +348,49 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 hidden" id="panelTables">
+                    <div class="mt-4 {{ $horoscopePageView === 'tables' ? '' : 'hidden' }}" id="panelTables">
                         <h3 class="font-semibold mb-3">{{ __('horoscope.planet_positions') }}</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <div class="text-sm text-gray-500 uppercase mb-2">{{ __('horoscope.natal') }}</div>
+                                <div class="text-sm text-gray-500 uppercase mb-2" id="primaryTableLabel">{{ __('horoscope.natal') }}</div>
                                 <div id="natalTable"></div>
                             </div>
                             <div>
-                                <div class="text-sm text-gray-500 uppercase mb-2">{{ __('horoscope.transit') }}</div>
+                                <div class="text-sm text-gray-500 uppercase mb-2" id="secondaryTableLabel">{{ __('horoscope.transit') }}</div>
                                 <div id="transitTable"></div>
                             </div>
                         </div>
 
                         <h3 class="font-semibold mb-3 mt-8">{{ __('horoscope.aspects_tab') }}</h3>
                         <div id="aspectsTable"></div>
+                    </div>
+
+                    <div class="mt-4 max-w-3xl mx-auto {{ $horoscopePageView === 'daily' ? '' : 'hidden' }}" id="panelDaily">
+                        <div class="mb-3">
+                            <h3 class="font-semibold">{{ __('horoscope.stars_message_tab') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">
+                                @if ($horoscopePageMode === 'dual')
+                                    {{ __('horoscope.daily_dual_hint') }}
+                                @else
+                                    {{ __('horoscope.daily_single_hint') }}
+                                @endif
+                            </p>
+                        </div>
+                        @include('partials.horoscope-daily-panel')
+                    </div>
+
+                    <div class="mt-4 max-w-3xl mx-auto {{ $horoscopePageView === 'explanation' ? '' : 'hidden' }}" id="panelExplanation">
+                        <div class="mb-3">
+                            <h3 class="font-semibold">{{ __('horoscope.explanation_tab') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">
+                                @if ($horoscopePageMode === 'dual')
+                                    {{ __('horoscope.explanation_dual_hint') }}
+                                @else
+                                    {{ __('horoscope.explanation_single_hint') }}
+                                @endif
+                            </p>
+                        </div>
+                        @include('partials.horoscope-explanation-panel')
                     </div>
                 </div>
             </div>
@@ -463,6 +455,26 @@
                 return horoscopeI18n.planets?.[name] || name;
             }
 
+            function isRetrogradePlanet(planet) {
+                return Boolean(planet?.retrograde);
+            }
+
+            function retrogradeSuffix(planet) {
+                return isRetrogradePlanet(planet) ? ` ${tr('retrograde_short')}` : '';
+            }
+
+            function planetDisplayName(planet) {
+                if (!planet || typeof planet === 'string') {
+                    return planetLabel(planet);
+                }
+
+                return `${planetLabel(planet.name)}${retrogradeSuffix(planet)}`;
+            }
+
+            function planetPositionLabel(planet) {
+                return `${planet.sign} ${planet.sign_degree.toFixed(2)}°`;
+            }
+
             function fixedStarLabel(name) {
                 return horoscopeI18n.fixed_stars?.[name] || name;
             }
@@ -474,9 +486,16 @@
             const geocodeUrl = '{{ route('horoscope.geocode', [], false) }}';
             const calcUrl = '{{ route('horoscope.calculate', [], false) }}';
             const elementInfoUrl = '{{ route('horoscope.info', [], false) }}';
+            const aspectInfoUrl = '{{ route('horoscope.aspect-info', [], false) }}';
+            const horoscopeDailyUrl = '{{ route('horoscope.daily-message', [], false) }}';
+            const horoscopeDailyExplanationUrl = '{{ route('horoscope.daily-message.explanation', [], false) }}';
+            const HOROSCOPE_PERIOD = @json(\App\Support\HoroscopePeriod::normalize(request()->query('period')));
             const horoscopeChatUrl = '{{ route('horoscope.chat', [], false) }}';
+            const HOROSCOPE_MODE = @json($horoscopePageMode);
+            const HOROSCOPE_VIEW = @json($horoscopePageView);
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
             let lastHoroscopeData = null;
+            let lastDualHoroscopeData = null;
 
             const natalInputs = {
                 date: document.getElementById('natalDate'),
@@ -489,20 +508,51 @@
             };
 
             const birthChartSelect = document.getElementById('birthChartSelect');
-            const setNowBtn = document.getElementById('setNow');
 
             const presetBtnOn = 'px-3 py-1.5 rounded bg-gray-900 text-white';
             const presetBtnOff = 'px-3 py-1.5 rounded border border-gray-300';
-            const birthSelectOn = 'px-3 py-1.5 rounded border-2 border-gray-900 text-sm max-w-xs min-w-[10rem] bg-gray-50';
-            const birthSelectOff = 'px-3 py-1.5 rounded border border-gray-300 text-sm max-w-xs min-w-[10rem]';
+            const birthSelectOn = 'w-full px-3 py-2 rounded border-2 border-gray-900 text-sm bg-gray-50';
+            const birthSelectOff = 'w-full px-3 py-2 rounded border border-gray-300 text-sm bg-white';
 
             function updatePresetButtons(mode) {
-                if (setNowBtn) {
-                    setNowBtn.className = mode === 'current' ? presetBtnOn : presetBtnOff;
-                }
                 if (birthChartSelect) {
                     birthChartSelect.className = mode === 'birth' ? birthSelectOn : birthSelectOff;
                 }
+            }
+
+            function resolveSingleBirthChartId() {
+                const value = String(birthChartSelect?.value ?? '');
+                if (value === '' || value === 'now') {
+                    return null;
+                }
+
+                const id = Number(value);
+                return Number.isFinite(id) && id > 0 ? id : null;
+            }
+
+            function isSingleChartNowSelected() {
+                return HOROSCOPE_MODE === 'single' && birthChartSelect?.value === 'now';
+            }
+
+            function applyBirthChartSelectValue() {
+                if (!birthChartSelect?.value) {
+                    return false;
+                }
+
+                if (birthChartSelect.value === 'now') {
+                    return applyPreset('current');
+                }
+
+                return applyPreset('birth', birthChartSelect.value);
+            }
+
+            function switchSingleChartToNowForManualEdit() {
+                if (!birthChartSelect || birthChartSelect.value === 'now') {
+                    return;
+                }
+
+                birthChartSelect.value = 'now';
+                updatePresetButtons('current');
             }
 
             const transitInputs = {
@@ -647,27 +697,551 @@
             let chartRoot = chartSvg;
             const natalTable = document.getElementById('natalTable');
             const transitTable = document.getElementById('transitTable');
+            const primaryTableLabel = document.getElementById('primaryTableLabel');
+            const secondaryTableLabel = document.getElementById('secondaryTableLabel');
             const zodiacModeSelect = document.getElementById('zodiacMode');
             const houseSystemSelect = document.getElementById('houseSystem');
             // jelenleg csak natal réteg van a keréken
             const showNatalCheckbox = { checked: true, addEventListener: () => {} };
             const showTransitCheckbox = { checked: false, addEventListener: () => {} };
             const aspectsTable = document.getElementById('aspectsTable');
-            const tabChart = document.getElementById('tabChart');
-            const tabTables = document.getElementById('tabTables');
-            const tabDual = document.getElementById('tabDual');
             const panelChart = document.getElementById('panelChart');
             const panelTables = document.getElementById('panelTables');
             const panelDual = document.getElementById('panelDual');
+            const panelDaily = document.getElementById('panelDaily');
+            const panelExplanation = document.getElementById('panelExplanation');
+            const horoscopeStarsMessageNav = document.getElementById('horoscopeStarsMessageNav');
+            const horoscopeNavDaily = document.getElementById('horoscopeNavDaily');
+            const horoscopeNavExplanation = document.getElementById('horoscopeNavExplanation');
+            const horoscopeDailyLoading = document.getElementById('horoscopeDailyLoading');
+            const horoscopeDailyError = document.getElementById('horoscopeDailyError');
+            const horoscopeDailyContent = document.getElementById('horoscopeDailyContent');
+            const horoscopeDailyBadge = document.getElementById('horoscopeDailyBadge');
+            const horoscopeDailyMeta = document.getElementById('horoscopeDailyMeta');
+            const horoscopeDailyMotto = document.getElementById('horoscopeDailyMotto');
+            const horoscopeDailySummary = document.getElementById('horoscopeDailySummary');
+            const horoscopeDailyHealth = document.getElementById('horoscopeDailyHealth');
+            const horoscopeDailyMoney = document.getElementById('horoscopeDailyMoney');
+            const horoscopeDailyRelationships = document.getElementById('horoscopeDailyRelationships');
+            const horoscopeDailyWork = document.getElementById('horoscopeDailyWork');
+            const horoscopeDailySummaryTitle = document.getElementById('horoscopeDailySummaryTitle');
+            const horoscopeExplanationLoading = document.getElementById('horoscopeExplanationLoading');
+            const horoscopeExplanationError = document.getElementById('horoscopeExplanationError');
+            const horoscopeExplanationContent = document.getElementById('horoscopeExplanationContent');
+            const horoscopeExplanationBadge = document.getElementById('horoscopeExplanationBadge');
+            const horoscopeExplanationMeta = document.getElementById('horoscopeExplanationMeta');
+            const horoscopeExplanationTitle = document.getElementById('horoscopeExplanationTitle');
+            const horoscopeExplanationText = document.getElementById('horoscopeExplanationText');
+            const horoscopePeriodButtons = document.querySelectorAll('.horoscope-period-btn');
+            const dualBirthChartSelectA = document.getElementById('dualBirthChartSelectA');
+            const dualBirthChartSelectB = document.getElementById('dualBirthChartSelectB');
             const dualADate = document.getElementById('dualADate');
             const dualATime = document.getElementById('dualATime');
             const dualBDate = document.getElementById('dualBDate');
             const dualBTime = document.getElementById('dualBTime');
-            const dualBirthChartSelectA = document.getElementById('dualBirthChartSelectA');
-            const dualBirthChartSelectB = document.getElementById('dualBirthChartSelectB');
             const dualANowStepping = document.getElementById('dualANowStepping');
             const dualBNowStepping = document.getElementById('dualBNowStepping');
-            let activeTabName = 'chart';
+            let activeViewName = HOROSCOPE_VIEW || 'chart';
+            let horoscopeDailyRequestSeq = 0;
+            let horoscopeDailyPeriod = HOROSCOPE_PERIOD || 'daily';
+            let horoscopeDailyMessageKind = null;
+            let cachedHoroscopeExplanation = '';
+            let horoscopeExplanationRequestSeq = 0;
+
+            function isDualNowBlockingStarsMessage() {
+                return HOROSCOPE_MODE === 'dual' && dualBirthChartSelectB?.value === 'now';
+            }
+
+            function isDualNowBlockingExplanation() {
+                if (HOROSCOPE_MODE !== 'dual') {
+                    return false;
+                }
+
+                return !isDualSavedBirthChartSelected(getDualBirthChartSelectA())
+                    || !isDualSavedBirthChartSelected(getDualBirthChartSelectB());
+            }
+
+            function isDualSavedBirthChartSelected(selectEl) {
+                return Boolean(resolveDualBirthChartId(selectEl));
+            }
+
+            function getDualBirthChartSelectA() {
+                return dualBirthChartSelectA;
+            }
+
+            function getDualBirthChartSelectB() {
+                return dualBirthChartSelectB;
+            }
+
+            const DUAL_CHART_SELECTION_STORAGE_KEY = 'horoscopeDualChartSelection';
+
+            function readDualChartSelectionFromStorage() {
+                try {
+                    const raw = sessionStorage.getItem(DUAL_CHART_SELECTION_STORAGE_KEY);
+                    if (!raw) {
+                        return null;
+                    }
+
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || typeof parsed !== 'object') {
+                        return null;
+                    }
+
+                    return {
+                        a: String(parsed.a ?? ''),
+                        b: String(parsed.b ?? ''),
+                    };
+                } catch {
+                    return null;
+                }
+            }
+
+            function writeDualChartSelectionToStorage() {
+                if (HOROSCOPE_MODE !== 'dual') {
+                    return;
+                }
+
+                sessionStorage.setItem(DUAL_CHART_SELECTION_STORAGE_KEY, JSON.stringify({
+                    a: dualBirthChartSelectA?.value ?? '',
+                    b: dualBirthChartSelectB?.value ?? '',
+                }));
+            }
+
+            function applyDualChartSelectionValues(sideA, sideB) {
+                let applied = false;
+
+                if (dualBirthChartSelectA && sideA !== undefined) {
+                    dualBirthChartSelectA.value = sideA;
+                    if (sideA && applyDualSelect('a', sideA)) {
+                        applied = true;
+                    }
+                }
+
+                if (dualBirthChartSelectB && sideB !== undefined) {
+                    dualBirthChartSelectB.value = sideB;
+                    if (sideB && applyDualSelect('b', sideB)) {
+                        applied = true;
+                    }
+                }
+
+                updateDualNowSteppingVisibility();
+                return applied;
+            }
+
+            function restoreDualChartSelectionFromStorage() {
+                const stored = readDualChartSelectionFromStorage();
+                if (!stored) {
+                    return false;
+                }
+
+                return applyDualChartSelectionValues(stored.a, stored.b);
+            }
+
+            function initDualChartSelectionDefaults() {
+                if (HOROSCOPE_MODE !== 'dual') {
+                    return;
+                }
+
+                if (restoreDualChartSelectionFromStorage()) {
+                    writeDualChartSelectionToStorage();
+                    return;
+                }
+
+                const defaultChart = BIRTH_CHARTS.find((chart) => chart.is_default) ?? BIRTH_CHARTS[0] ?? null;
+
+                if (defaultChart && dualBirthChartSelectA && !resolveDualBirthChartId(dualBirthChartSelectA)) {
+                    dualBirthChartSelectA.value = String(defaultChart.id);
+                    applyDualSelect('a', String(defaultChart.id));
+                } else if (dualBirthChartSelectA?.value) {
+                    applyDualSelect('a', dualBirthChartSelectA.value);
+                }
+
+                if (dualBirthChartSelectB?.value === '') {
+                    dualBirthChartSelectB.value = 'now';
+                }
+
+                if (dualBirthChartSelectB?.value) {
+                    applyDualSelect('b', dualBirthChartSelectB.value);
+                }
+
+                updateDualNowSteppingVisibility();
+                writeDualChartSelectionToStorage();
+            }
+
+            function updateStarsMessageNavVisibility() {
+                const hideDaily = isDualNowBlockingStarsMessage();
+                const hideExplanation = isDualNowBlockingExplanation();
+
+                horoscopeNavDaily?.classList.toggle('hidden', hideDaily);
+                horoscopeNavExplanation?.classList.toggle('hidden', hideExplanation);
+                horoscopeStarsMessageNav?.classList.toggle('hidden', hideDaily && hideExplanation);
+
+                if ((hideDaily && activeViewName === 'daily')
+                    || (hideExplanation && activeViewName === 'explanation')) {
+                    const chartUrl = HOROSCOPE_MODE === 'dual'
+                        ? '{{ route('horoscope.index', ['mode' => 'dual', 'view' => 'chart'], false) }}'
+                        : '{{ route('horoscope.index', ['view' => 'chart'], false) }}';
+                    window.location.replace(chartUrl);
+                }
+            }
+
+            function setHoroscopeDailyPeriod(period) {
+                horoscopeDailyPeriod = period;
+                horoscopePeriodButtons.forEach((button) => {
+                    button.classList.toggle('horoscope-period-btn-active', button.dataset.period === period);
+                });
+            }
+
+            function resetHoroscopeExplanationCache() {
+                cachedHoroscopeExplanation = '';
+            }
+
+            function resetHoroscopeExplanationPanel() {
+                resetHoroscopeExplanationCache();
+                horoscopeExplanationLoading?.classList.remove('hidden');
+                horoscopeExplanationError?.classList.add('hidden');
+                horoscopeExplanationContent?.classList.add('hidden');
+                horoscopeExplanationBadge?.classList.add('hidden');
+                horoscopeExplanationMeta?.classList.add('hidden');
+                if (horoscopeExplanationText) {
+                    horoscopeExplanationText.textContent = '';
+                }
+            }
+
+            function showHoroscopeExplanationError(message) {
+                horoscopeExplanationLoading?.classList.add('hidden');
+                horoscopeExplanationContent?.classList.add('hidden');
+                if (horoscopeExplanationError) {
+                    horoscopeExplanationError.textContent = message || tr('explanation_error');
+                    horoscopeExplanationError.classList.remove('hidden');
+                }
+            }
+
+            function renderHoroscopeExplanation(data) {
+                horoscopeExplanationLoading?.classList.add('hidden');
+                horoscopeExplanationError?.classList.add('hidden');
+                horoscopeExplanationContent?.classList.remove('hidden');
+
+                const kind = data.kind || horoscopeDailyMessageKind;
+                if (horoscopeExplanationBadge) {
+                    horoscopeExplanationBadge.textContent = data.badge || '';
+                    horoscopeExplanationBadge.classList.toggle('hidden', !data.badge);
+                }
+                if (horoscopeExplanationMeta) {
+                    horoscopeExplanationMeta.textContent = data.chart_meta || '';
+                    horoscopeExplanationMeta.classList.toggle('hidden', !data.chart_meta);
+                }
+                if (horoscopeExplanationTitle) {
+                    horoscopeExplanationTitle.textContent = kind === 'partnership'
+                        ? tr('explanation_title_partnership')
+                        : tr('explanation_title_birth_chart');
+                }
+                if (horoscopeExplanationText) {
+                    horoscopeExplanationText.textContent = data.explanation || cachedHoroscopeExplanation || '';
+                }
+            }
+
+            function resolveExplanationBirthChartId() {
+                return resolveSingleBirthChartId();
+            }
+
+            function isExplanationNowSelected() {
+                return isSingleChartNowSelected();
+            }
+
+            function buildExplanationNowChartPayload() {
+                return {
+                    datetime_utc: toUtcIso(
+                        natalInputs.date.value,
+                        natalInputs.time.value,
+                        Number(natalInputs.offset.value),
+                    ),
+                    lat: Number(natalInputs.lat.value),
+                    lon: Number(natalInputs.lon.value),
+                };
+            }
+
+            function horoscopeExplanationPayload() {
+                if (HOROSCOPE_MODE === 'dual') {
+                    return {
+                        mode: 'dual',
+                        birth_chart_id_a: resolveDualBirthChartId(getDualBirthChartSelectA()),
+                        birth_chart_id_b: resolveDualBirthChartId(getDualBirthChartSelectB()),
+                    };
+                }
+
+                if (isExplanationNowSelected()) {
+                    return {
+                        mode: 'single',
+                        is_now: true,
+                        chart: buildExplanationNowChartPayload(),
+                    };
+                }
+
+                const birthChartId = resolveExplanationBirthChartId();
+                return {
+                    mode: 'single',
+                    birth_chart_id: birthChartId,
+                };
+            }
+
+            function horoscopeDailyPayload() {
+                const base = HOROSCOPE_MODE === 'dual'
+                    ? {
+                        mode: 'dual',
+                        birth_chart_id_a: resolveDualBirthChartId(dualBirthChartSelectA),
+                        birth_chart_id_b: resolveDualBirthChartId(dualBirthChartSelectB),
+                    }
+                    : {
+                        mode: 'single',
+                        birth_chart_id: resolveSingleBirthChartId(),
+                    };
+
+                return {
+                    ...base,
+                    period: horoscopeDailyPeriod,
+                };
+            }
+
+            function resetHoroscopeDailyPanel() {
+                horoscopeDailyLoading?.classList.remove('hidden');
+                horoscopeDailyError?.classList.add('hidden');
+                horoscopeDailyContent?.classList.add('hidden');
+                horoscopeDailyBadge?.classList.add('hidden');
+                horoscopeDailyMeta?.classList.add('hidden');
+            }
+
+            function showHoroscopeDailyError(message) {
+                horoscopeDailyLoading?.classList.add('hidden');
+                horoscopeDailyContent?.classList.add('hidden');
+                if (horoscopeDailyError) {
+                    horoscopeDailyError.textContent = message || tr('daily_error');
+                    horoscopeDailyError.classList.remove('hidden');
+                }
+            }
+
+            function renderHoroscopeDailyMessage(data) {
+                horoscopeDailyLoading?.classList.add('hidden');
+                horoscopeDailyError?.classList.add('hidden');
+                horoscopeDailyContent?.classList.remove('hidden');
+
+                horoscopeDailyMessageKind = data.kind || null;
+
+                if (horoscopeDailyBadge) {
+                    horoscopeDailyBadge.textContent = data.badge || '';
+                    horoscopeDailyBadge.classList.toggle('hidden', !data.badge);
+                }
+
+                if (horoscopeDailyMeta) {
+                    horoscopeDailyMeta.textContent = data.chart_meta || '';
+                    horoscopeDailyMeta.classList.toggle('hidden', !data.chart_meta);
+                }
+
+                if (horoscopeDailySummaryTitle) {
+                    horoscopeDailySummaryTitle.textContent = data.summary_title || tr('summary_title_daily');
+                }
+
+                if (horoscopeDailyMotto) {
+                    horoscopeDailyMotto.textContent = data.motto ? `„${data.motto}”` : '';
+                }
+
+                if (horoscopeDailySummary) horoscopeDailySummary.textContent = data.summary || '';
+                if (horoscopeDailyHealth) horoscopeDailyHealth.textContent = data.health || '';
+                if (horoscopeDailyMoney) horoscopeDailyMoney.textContent = data.money || '';
+                if (horoscopeDailyRelationships) horoscopeDailyRelationships.textContent = data.relationships || '';
+                if (horoscopeDailyWork) horoscopeDailyWork.textContent = data.work || '';
+            }
+
+            async function loadHoroscopeDailyExplanation() {
+                if (!panelExplanation || activeViewName !== 'explanation') {
+                    return;
+                }
+
+                if (isDualNowBlockingExplanation()) {
+                    showHoroscopeExplanationError(tr('daily_select_two_birth_charts'));
+                    return;
+                }
+
+                ensureDefaultExplanationChartSelection();
+
+                if (!canLoadHoroscopeExplanation()) {
+                    const missingChartMessage = HOROSCOPE_MODE === 'dual'
+                        ? tr('daily_select_two_birth_charts')
+                        : (isExplanationNowSelected()
+                            ? tr('err_coordinates')
+                            : tr('daily_select_birth_chart'));
+                    showHoroscopeExplanationError(missingChartMessage);
+                    return;
+                }
+
+                if (cachedHoroscopeExplanation) {
+                    renderHoroscopeExplanation({ explanation: cachedHoroscopeExplanation, kind: horoscopeDailyMessageKind });
+                    return;
+                }
+
+                const requestId = ++horoscopeExplanationRequestSeq;
+                resetHoroscopeExplanationPanel();
+
+                try {
+                    const response = await fetch(horoscopeDailyExplanationUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(horoscopeExplanationPayload()),
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (requestId !== horoscopeExplanationRequestSeq) {
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        if (response.status === 419) {
+                            throw new Error(tr('session_expired'));
+                        }
+
+                        throw new Error(data.error || tr('explanation_error'));
+                    }
+
+                    cachedHoroscopeExplanation = data.explanation || '';
+                    horoscopeDailyMessageKind = data.kind || horoscopeDailyMessageKind;
+                    renderHoroscopeExplanation(data);
+                } catch (error) {
+                    if (requestId !== horoscopeExplanationRequestSeq) {
+                        return;
+                    }
+
+                    showHoroscopeExplanationError(error?.message || tr('explanation_error'));
+                }
+            }
+
+            async function loadHoroscopeDailyMessage() {
+                if (!panelDaily || activeViewName !== 'daily') {
+                    return;
+                }
+
+                ensureDefaultBirthChartForDaily();
+
+                if (!canLoadHoroscopeDailyMessage()) {
+                    const missingChartMessage = HOROSCOPE_MODE === 'dual'
+                        ? tr('daily_select_two_birth_charts')
+                        : tr('daily_select_birth_chart');
+                    showHoroscopeDailyError(missingChartMessage);
+                    return;
+                }
+
+                const payload = horoscopeDailyPayload();
+                const requestId = ++horoscopeDailyRequestSeq;
+                resetHoroscopeDailyPanel();
+
+                try {
+                    const response = await fetch(horoscopeDailyUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (requestId !== horoscopeDailyRequestSeq) {
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        if (response.status === 419) {
+                            throw new Error(tr('session_expired'));
+                        }
+
+                        throw new Error(data.error || tr('daily_error'));
+                    }
+
+                    renderHoroscopeDailyMessage(data);
+                } catch (error) {
+                    if (requestId !== horoscopeDailyRequestSeq) {
+                        return;
+                    }
+
+                    showHoroscopeDailyError(error?.message || tr('daily_error'));
+                }
+            }
+
+            function resolveDualBirthChartId(selectEl) {
+                const value = String(selectEl?.value ?? '');
+                if (value === '' || value === 'now') {
+                    return null;
+                }
+
+                return Number(value);
+            }
+
+            function ensureDefaultSingleChartSelection() {
+                if (HOROSCOPE_MODE !== 'single' || !birthChartSelect || birthChartSelect.value !== '') {
+                    return;
+                }
+
+                const defaultChart = BIRTH_CHARTS.find((chart) => chart.is_default) ?? BIRTH_CHARTS[0] ?? null;
+                birthChartSelect.value = defaultChart ? String(defaultChart.id) : 'now';
+            }
+
+            function ensureDefaultBirthChartForDaily() {
+                if (HOROSCOPE_MODE === 'dual') {
+                    ensureDualDailyChartSelection();
+                    return;
+                }
+
+                ensureDefaultSingleChartSelection();
+            }
+
+            function canLoadHoroscopeDailyMessage() {
+                const payload = horoscopeDailyPayload();
+
+                if (payload.mode === 'dual') {
+                    return Boolean(payload.birth_chart_id_a && payload.birth_chart_id_b);
+                }
+
+                return Boolean(payload.birth_chart_id);
+            }
+
+            function canLoadHoroscopeExplanation() {
+                const payload = horoscopeExplanationPayload();
+
+                if (payload.mode === 'dual') {
+                    return Boolean(payload.birth_chart_id_a && payload.birth_chart_id_b);
+                }
+
+                if (payload.is_now) {
+                    const chart = payload.chart || {};
+                    return Boolean(chart.datetime_utc && Number.isFinite(chart.lat) && Number.isFinite(chart.lon));
+                }
+
+                return Boolean(payload.birth_chart_id);
+            }
+
+            function ensureDualDailyChartSelection() {
+                if (HOROSCOPE_MODE !== 'dual' || BIRTH_CHARTS.length < 2) {
+                    return;
+                }
+
+                const currentA = resolveDualBirthChartId(dualBirthChartSelectA);
+                const currentB = resolveDualBirthChartId(dualBirthChartSelectB);
+                if (currentA && currentB && currentA !== currentB) {
+                    return;
+                }
+
+                const first = BIRTH_CHARTS.find((chart) => chart.is_default) ?? BIRTH_CHARTS[0];
+                const second = BIRTH_CHARTS.find((chart) => chart.id !== first.id) ?? BIRTH_CHARTS[1];
+
+                if (dualBirthChartSelectA) {
+                    dualBirthChartSelectA.value = String(first.id);
+                }
+                if (dualBirthChartSelectB) {
+                    dualBirthChartSelectB.value = String(second.id);
+                }
+            }
             let dualBooted = false;
             const dualChartMeta = {
                 a: { lat: null, lon: null, offset: 2 },
@@ -796,6 +1370,126 @@
                 }
             });
 
+            function getChartGender(chartId) {
+                if (!chartId) {
+                    return null;
+                }
+                return getBirthChartById(chartId)?.gender ?? null;
+            }
+
+            function getSingleChartGender() {
+                const chartId = resolveSingleBirthChartId();
+                return chartId ? getChartGender(chartId) : null;
+            }
+
+            function getDualSideMeta(side) {
+                const select = side === 'a' ? dualBirthChartSelectA : dualBirthChartSelectB;
+                const value = select?.value ?? '';
+                if (value === 'now') {
+                    return { isNow: true, chartId: null, gender: null };
+                }
+                if (value) {
+                    return { isNow: false, chartId: Number(value), gender: getChartGender(value) };
+                }
+                return { isNow: false, chartId: null, gender: null };
+            }
+
+            function bodyDescriptor(planet, owner, gender) {
+                return {
+                    name: planet.name,
+                    sign: planet.sign,
+                    house: planet.house ?? null,
+                    sign_degree: planet.sign_degree ?? null,
+                    owner,
+                    gender: gender ?? null,
+                    retrograde: isRetrogradePlanet(planet),
+                };
+            }
+
+            function buildNatalAspectContext(p1, p2, def) {
+                const gender = getSingleChartGender();
+
+                return {
+                    mode: 'natal',
+                    aspect: def.name,
+                    body1: bodyDescriptor(p1, 'natal', gender),
+                    body2: bodyDescriptor(p2, 'natal', gender),
+                    meta: {
+                        chart_a_id: resolveSingleBirthChartId(),
+                        chart_b_id: null,
+                        side_a_is_now: isSingleChartNowSelected(),
+                        side_b_is_now: false,
+                    },
+                };
+            }
+
+            function buildCrossAspectContext(p1, p2, def) {
+                const sideA = getDualSideMeta('a');
+                const sideB = getDualSideMeta('b');
+                const bothBirth = !sideA.isNow && !sideB.isNow && sideA.chartId && sideB.chartId;
+                const mode = bothBirth ? 'synastry' : 'transit';
+
+                return {
+                    mode,
+                    aspect: def.name,
+                    body1: bodyDescriptor(p1, 'a', sideA.gender),
+                    body2: bodyDescriptor(p2, 'b', sideB.gender),
+                    meta: {
+                        chart_a_id: sideA.chartId,
+                        chart_b_id: sideB.chartId,
+                        side_a_is_now: sideA.isNow,
+                        side_b_is_now: sideB.isNow,
+                    },
+                };
+            }
+
+            function aspectRowTitle(p1, p2, def) {
+                return `${planetLabel(p1.name)} ${def.mark} ${planetLabel(p2.name)}`;
+            }
+
+            async function openAspectInfoPopup(context, title) {
+                if (elementInfoBusy || !context) {
+                    return;
+                }
+
+                elementInfoBusy = true;
+                openElementInfoModal(title, tr('element_info_loading'));
+
+                try {
+                    const response = await fetch(aspectInfoUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(context),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.error || tr('element_info_error'));
+                    }
+
+                    const hint = data.cached ? tr('element_info_cached_hint') : tr('element_info_new_hint');
+                    openElementInfoModal(data.title || title, data.answer || '', hint);
+                } catch (error) {
+                    console.error('Aspect info failed:', error);
+                    openElementInfoModal(title, '');
+                    showElementInfoError(error?.message || tr('element_info_error'));
+                } finally {
+                    elementInfoBusy = false;
+                }
+            }
+
+            function bindAspectRowClicks(container, handler) {
+                container?.querySelectorAll('[data-aspect-row]').forEach((row) => {
+                    row.addEventListener('click', () => {
+                        const index = Number(row.dataset.aspectIndex);
+                        handler(index);
+                    });
+                });
+            }
+
             function clearFixedStarNameLabels() {
                 chartRoot?.querySelectorAll('[data-fixed-star-label]').forEach((el) => el.remove());
             }
@@ -883,22 +1577,84 @@
             let calculateSeq = 0;
             let dualCalculateSeq = 0;
 
-            function setActiveTab(name) {
-                activeTabName = name;
-                const btnOn = 'px-3 py-2 rounded bg-indigo-600 text-white inline-flex items-center justify-center';
-                const btnOff = 'px-3 py-2 rounded border border-gray-300 inline-flex items-center justify-center';
+            function setTableLabels(primary, secondary) {
+                if (primaryTableLabel) primaryTableLabel.textContent = primary;
+                if (secondaryTableLabel) secondaryTableLabel.textContent = secondary;
+            }
 
-                tabChart.className = name === 'chart' ? btnOn : btnOff;
-                tabTables.className = name === 'tables' ? btnOn : btnOff;
-                tabDual.className = name === 'dual' ? btnOn : btnOff;
+            function syncHoroscopeViewPanels() {
+                const onChart = activeViewName === 'chart';
+                const onTables = activeViewName === 'tables';
+                const onDaily = activeViewName === 'daily';
+                const onExplanation = activeViewName === 'explanation';
 
-                panelChart.classList.toggle('hidden', name !== 'chart');
-                panelTables.classList.toggle('hidden', name !== 'tables');
-                panelDual.classList.toggle('hidden', name !== 'dual');
-
-                if (name === 'dual') {
-                    bootDualChart();
+                if (HOROSCOPE_MODE === 'dual') {
+                    panelChart?.classList.add('hidden');
+                    panelDual?.classList.toggle('hidden', !onChart);
+                    panelTables?.classList.toggle('hidden', !onTables);
+                    panelDaily?.classList.toggle('hidden', !onDaily);
+                    panelExplanation?.classList.toggle('hidden', !onExplanation);
+                    setTableLabels(tr('dual_a'), tr('dual_b'));
+                    return;
                 }
+
+                panelDual?.classList.add('hidden');
+                panelChart?.classList.toggle('hidden', !onChart);
+                panelTables?.classList.toggle('hidden', !onTables);
+                panelDaily?.classList.toggle('hidden', !onDaily);
+                panelExplanation?.classList.toggle('hidden', !onExplanation);
+                setTableLabels(tr('natal'), tr('transit'));
+            }
+
+            function loadActiveHoroscopeMessageView() {
+                if (activeViewName === 'daily') {
+                    ensureDefaultBirthChartForDaily();
+                    loadHoroscopeDailyMessage();
+                } else if (activeViewName === 'explanation') {
+                    ensureDefaultSingleChartSelection();
+                    loadHoroscopeDailyExplanation();
+                }
+            }
+
+            function reloadActiveStarsMessageView() {
+                resetHoroscopeExplanationCache();
+                loadActiveHoroscopeMessageView();
+            }
+
+            function initHoroscopePage() {
+                activeViewName = HOROSCOPE_VIEW || 'chart';
+                setHoroscopeDailyPeriod(HOROSCOPE_PERIOD || 'daily');
+                initDualChartSelectionDefaults();
+                updateStarsMessageNavVisibility();
+
+                horoscopePeriodButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const period = button.dataset.period;
+                        if (!period || period === horoscopeDailyPeriod) {
+                            return;
+                        }
+
+                        setHoroscopeDailyPeriod(period);
+                        if (activeViewName === 'daily') {
+                            loadHoroscopeDailyMessage();
+                        }
+                    });
+                });
+
+                syncHoroscopeViewPanels();
+
+                if (HOROSCOPE_MODE === 'dual') {
+                    if (activeViewName === 'chart') {
+                        bootDualChart();
+                    }
+                    loadActiveHoroscopeMessageView();
+                    return;
+                }
+
+                if (activeViewName === 'chart') {
+                    // single chart panel already visible
+                }
+                loadActiveHoroscopeMessageView();
             }
 
             function resetChartSettingsToProfile() {
@@ -923,7 +1679,7 @@
                 el?.addEventListener('change', () => {
                     updateModeHint();
                     calculate();
-                    if (activeTabName === 'dual') {
+                    if (HOROSCOPE_MODE === 'dual') {
                         calculateDual();
                     }
                 });
@@ -940,10 +1696,10 @@
 
                 const rows = aspects
                     .map(
-                        ({ p1, p2, def }) => `<tr>
-                            <td class="py-2 pr-4">${planetLabel(p1.name)}</td>
+                        ({ p1, p2, def }, index) => `<tr class="cursor-pointer hover:bg-indigo-50" data-aspect-row data-aspect-index="${index}">
+                            <td class="py-2 pr-4">${planetDisplayName(p1)}</td>
                             <td class="py-2 pr-4 font-semibold" style="color:${def.color}">${def.mark}</td>
-                            <td class="py-2">${planetLabel(p2.name)}</td>
+                            <td class="py-2">${planetDisplayName(p2)}</td>
                         </tr>`
                     )
                     .join('');
@@ -960,6 +1716,62 @@
                         <tbody class="divide-y">${rows}</tbody>
                     </table>
                 </div>`;
+
+                bindAspectRowClicks(target, (index) => {
+                    const aspect = aspects[index];
+                    if (!aspect) {
+                        return;
+                    }
+                    openAspectInfoPopup(
+                        buildNatalAspectContext(aspect.p1, aspect.p2, aspect.def),
+                        aspectRowTitle(aspect.p1, aspect.p2, aspect.def),
+                    );
+                });
+            }
+
+            function renderCrossAspectsTable(target, planetsA, planetsB) {
+                const aspects = calcCrossAspects(planetsA, planetsB)
+                    .slice()
+                    .sort((a, b) => a.def.angle - b.def.angle || a.orb - b.orb);
+
+                if (!aspects.length) {
+                    target.innerHTML = `<div class="text-sm text-gray-500">${tr('no_aspects')}</div>`;
+                    return;
+                }
+
+                const rows = aspects
+                    .map(
+                        ({ p1, p2, def }, index) => `<tr class="cursor-pointer hover:bg-indigo-50" data-aspect-row data-aspect-index="${index}">
+                            <td class="py-2 pr-4 text-blue-700">${planetDisplayName(p1)}</td>
+                            <td class="py-2 pr-4 font-semibold" style="color:${def.color}">${def.mark}</td>
+                            <td class="py-2 text-red-700">${planetDisplayName(p2)}</td>
+                        </tr>`
+                    )
+                    .join('');
+
+                target.innerHTML = `<div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left border-b">
+                                <th class="py-2 pr-4">${tr('dual_a')}</th>
+                                <th class="py-2 pr-4">${tr('mark')}</th>
+                                <th class="py-2">${tr('dual_b')}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">${rows}</tbody>
+                    </table>
+                </div>`;
+
+                bindAspectRowClicks(target, (index) => {
+                    const aspect = aspects[index];
+                    if (!aspect) {
+                        return;
+                    }
+                    openAspectInfoPopup(
+                        buildCrossAspectContext(aspect.p1, aspect.p2, aspect.def),
+                        aspectRowTitle(aspect.p1, aspect.p2, aspect.def),
+                    );
+                });
             }
 
             function localToUtcMs(dateStr, timeStr, offsetHours) {
@@ -971,6 +1783,7 @@
             }
 
             function shiftNatalTimeBySeconds(deltaSeconds) {
+                switchSingleChartToNowForManualEdit();
                 const err = validateInputs(natalInputs);
                 if (err) {
                     errorBox.textContent = err;
@@ -993,6 +1806,7 @@
             }
 
             function shiftNatalTimeByMonths(deltaMonths) {
+                switchSingleChartToNowForManualEdit();
                 const err = validateInputs(natalInputs);
                 if (err) {
                     errorBox.textContent = err;
@@ -1143,8 +1957,8 @@
                     .sort((a, b) => planetsOrder.indexOf(a.name) - planetsOrder.indexOf(b.name))
                     .map(
                         (planet) => `<tr>
-                            <td>${planetLabel(planet.name)}</td>
-                            <td>${planet.sign} ${planet.sign_degree.toFixed(2)}°</td>
+                            <td>${planetDisplayName(planet)}</td>
+                            <td>${planetPositionLabel(planet)}</td>
                             <td>${planet.house}</td>
                         </tr>`
                     )
@@ -1808,7 +2622,7 @@
                 const layer = getLayer('aspects');
                 if (!layer) return;
                 const aspects = calcCrossAspects(planetsA, planetsB);
-                aspects.forEach(({ p1, p2, def }) => {
+                aspects.forEach(({ p1, p2, def }, index) => {
                     const a = polarToCartesian(normalizeAngle(p1.longitude + rotationDeg), radius);
                     const b = polarToCartesian(normalizeAngle(p2.longitude + rotationDeg), radius);
                     const line = svgEl('line');
@@ -1819,6 +2633,13 @@
                     line.setAttribute('stroke', def.color);
                     line.setAttribute('stroke-width', '2.2');
                     line.setAttribute('opacity', String(strokeOpacity));
+                    line.setAttribute('class', 'cursor-pointer');
+                    line.addEventListener('click', () => {
+                        openAspectInfoPopup(
+                            buildCrossAspectContext(p1, p2, def),
+                            aspectRowTitle(p1, p2, def),
+                        );
+                    });
                     layer.appendChild(line);
 
                     drawAspectMark(def, a, b);
@@ -1860,6 +2681,13 @@
                     line.setAttribute('stroke', def.color);
                     line.setAttribute('stroke-width', '2.2');
                     line.setAttribute('opacity', String(strokeOpacity));
+                    line.setAttribute('class', 'cursor-pointer');
+                    line.addEventListener('click', () => {
+                        openAspectInfoPopup(
+                            buildNatalAspectContext(p1, p2, def),
+                            aspectRowTitle(p1, p2, def),
+                        );
+                    });
                     layer.appendChild(line);
 
                     drawAspectMark(def, a, b);
@@ -1921,7 +2749,7 @@
                 }
             }
 
-            function drawPlanetGlyph(name, x, y, style) {
+            function drawPlanetGlyph(name, x, y, style, retrograde = false) {
                 const layer = getLayer('planets');
                 if (!layer) return;
 
@@ -1948,6 +2776,19 @@
                 t.setAttribute('fill', style.fg);
                 t.textContent = style.symbol;
                 g.appendChild(t);
+
+                if (retrograde) {
+                    const marker = svgEl('text');
+                    marker.setAttribute('x', String(style.r + 1));
+                    marker.setAttribute('y', String(-style.r + 1));
+                    marker.setAttribute('text-anchor', 'start');
+                    marker.setAttribute('dominant-baseline', 'middle');
+                    marker.setAttribute('font-size', '7');
+                    marker.setAttribute('font-weight', '700');
+                    marker.setAttribute('fill', style.fg);
+                    marker.textContent = tr('retrograde_short');
+                    g.appendChild(marker);
+                }
 
                 if (style.opacity !== undefined && style.opacity < 1) {
                     g.setAttribute('opacity', String(style.opacity));
@@ -2002,7 +2843,7 @@
                     dot.setAttribute('opacity', String(opacity));
                     layer.appendChild(dot);
 
-                    drawPlanetGlyph(planet.name, point.x, point.y, { ...style, opacity });
+                    drawPlanetGlyph(planet.name, point.x, point.y, { ...style, opacity }, isRetrogradePlanet(planet));
                 });
             }
 
@@ -2267,6 +3108,10 @@
                     }
 
                     renderDualChart(data);
+                    lastDualHoroscopeData = data;
+                    renderTable(natalTable, data.natal.planets);
+                    renderTable(transitTable, data.transit.planets);
+                    renderCrossAspectsTable(aspectsTable, data.natal.planets, data.transit.planets);
                 } catch (error) {
                     if (seq !== dualCalculateSeq) return;
                     console.error('Dual horoscope calculate failed:', error);
@@ -2280,19 +3125,9 @@
             async function bootDualChart() {
                 if (!dualBooted) {
                     dualBooted = true;
-                    const defaultChart = BIRTH_CHARTS.find((chart) => chart.is_default) ?? BIRTH_CHARTS[0];
-                    if (defaultChart) {
-                        if (dualBirthChartSelectA) {
-                            dualBirthChartSelectA.value = String(defaultChart.id);
-                        }
-                        applyDualBirthChart('a', defaultChart.id);
-                    }
-                    applyDualNow('b');
-                    if (dualBirthChartSelectB) {
-                        dualBirthChartSelectB.value = 'now';
-                    }
                     updateDualNowSteppingVisibility();
                 }
+                updateStarsMessageNavVisibility();
                 await calculateDual();
             }
 
@@ -2348,7 +3183,7 @@
                         sidereal: zodiacModeSelect.value === 'sidereal',
                         ayanamsa: 'lahiri',
                         house_system: houseSystemSelect.value,
-                        birth_chart_id: birthChartSelect?.value ? Number(birthChartSelect.value) : null,
+                        birth_chart_id: resolveSingleBirthChartId(),
                     };
 
                     const response = await fetch(calcUrl, {
@@ -2432,19 +3267,13 @@
             updateModeHint();
 
             (async function bootHoroscope() {
-                const defaultChart = BIRTH_CHARTS.find((chart) => chart.is_default) ?? BIRTH_CHARTS[0] ?? null;
-
-                if (defaultChart) {
-                    if (birthChartSelect) {
-                        birthChartSelect.value = String(defaultChart.id);
-                    }
-                    if (applyPreset('birth', defaultChart.id)) {
-                        await calculate();
-                    }
+                if (HOROSCOPE_MODE !== 'single') {
                     return;
                 }
 
-                if (applyPreset('current')) {
+                ensureDefaultSingleChartSelection();
+
+                if (applyBirthChartSelectValue()) {
                     await calculate();
                 }
             })();
@@ -2457,7 +3286,10 @@
                 transitInputs.time,
                 transitInputs.offset,
             ].forEach((el) => {
-                el.addEventListener('change', calculate);
+                el.addEventListener('change', () => {
+                    switchSingleChartToNowForManualEdit();
+                    calculate();
+                });
             });
 
             // léptető gombok
@@ -2530,22 +3362,14 @@
                 });
             });
 
-            setNowBtn?.addEventListener('click', () => {
-                if (birthChartSelect) {
-                    birthChartSelect.value = '';
-                }
-                if (applyPreset('current')) {
-                    calculate();
-                }
-            });
-
             document.getElementById('resetNowStepping')?.addEventListener('click', () => {
                 if (birthChartSelect) {
-                    birthChartSelect.value = '';
+                    birthChartSelect.value = 'now';
                 }
                 if (applyPreset('current')) {
                     calculate();
                 }
+                reloadActiveStarsMessageView();
             });
 
             document.querySelectorAll('[data-dual-reset-now]').forEach((btn) => {
@@ -2561,37 +3385,44 @@
 
             birthChartSelect?.addEventListener('change', () => {
                 if (!birthChartSelect.value) {
+                    reloadActiveStarsMessageView();
                     return;
                 }
-                if (applyPreset('birth', birthChartSelect.value)) {
+                if (applyBirthChartSelectValue()) {
                     calculate();
                 }
+                reloadActiveStarsMessageView();
             });
 
             // Tab kezelés
-            tabChart.addEventListener('click', () => setActiveTab('chart'));
-            tabTables.addEventListener('click', () => setActiveTab('tables'));
-            tabDual.addEventListener('click', () => setActiveTab('dual'));
-            setActiveTab('chart');
+            initHoroscopePage();
 
             dualBirthChartSelectA?.addEventListener('change', () => {
                 updateDualNowSteppingVisibility();
+                writeDualChartSelectionToStorage();
+                updateStarsMessageNavVisibility();
                 if (!dualBirthChartSelectA.value) {
+                    reloadActiveStarsMessageView();
                     return;
                 }
                 if (applyDualSelect('a', dualBirthChartSelectA.value)) {
                     calculateDual();
                 }
+                reloadActiveStarsMessageView();
             });
 
             dualBirthChartSelectB?.addEventListener('change', () => {
                 updateDualNowSteppingVisibility();
+                writeDualChartSelectionToStorage();
+                updateStarsMessageNavVisibility();
                 if (!dualBirthChartSelectB.value) {
+                    reloadActiveStarsMessageView();
                     return;
                 }
                 if (applyDualSelect('b', dualBirthChartSelectB.value)) {
                     calculateDual();
                 }
+                reloadActiveStarsMessageView();
             });
 
             [dualADate, dualATime, dualBDate, dualBTime].forEach((el) => {
@@ -2648,7 +3479,7 @@
                     const payload = {
                         prompt,
                         chart: lastHoroscopeData,
-                        birth_chart_id: birthChartSelect?.value ? Number(birthChartSelect.value) : null,
+                        birth_chart_id: resolveSingleBirthChartId(),
                     };
 
                     const response = await fetch(horoscopeChatUrl, {
