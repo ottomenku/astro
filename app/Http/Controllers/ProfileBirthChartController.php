@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BirthChartRequest;
 use App\Models\BirthChart;
 use App\Services\AstrologyChartScoringService;
+use App\Support\BirthPlaceDefaults;
+use App\Support\BirthTimezoneOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -23,7 +25,10 @@ class ProfileBirthChartController extends Controller
     {
         return view('profile.birth-charts.create', [
             'birthChart' => new BirthChart([
-                'birth_tz_offset' => 2,
+                'birth_tz_offset' => BirthTimezoneOptions::defaultOffset(),
+                'birth_place_label' => BirthPlaceDefaults::placeLabel(),
+                'birth_lat' => BirthPlaceDefaults::lat(),
+                'birth_lon' => BirthPlaceDefaults::lon(),
                 'time_accuracy' => 3,
                 'is_default' => false,
             ]),

@@ -46,31 +46,38 @@ class HoroscopeController extends Controller
     public function geocode(Request $request)
     {
         $query = trim((string) $request->query('q', ''));
+        $country = strtolower(trim((string) $request->query('country', '')));
 
-        if (mb_strlen($query) < 3) {
+        if (mb_strlen($query) < 2) {
             return response()->json(['results' => []]);
         }
 
+        if (! \App\Support\CountryList::isValid($country)) {
+            return response()->json(['results' => []], 422);
+        }
+
         try {
-            $response = Http::withHeaders([
-                'User-Agent' => self::DEFAULT_USER_AGENT,
-            ])->get(self::NOMINATIM_URL, [
+            $params = [
                 'q' => $query,
                 'format' => 'json',
                 'addressdetails' => 1,
-                'limit' => 5,
-            ]);
+                'limit' => 8,
+            ];
+
+            if ($country !== '') {
+                $params['countrycodes'] = $country;
+            }
+
+            $response = Http::withHeaders([
+                'User-Agent' => self::DEFAULT_USER_AGENT,
+            ])->get(self::NOMINATIM_URL, $params);
 
             if ($response->failed()) {
                 return response()->json(['results' => []], 502);
             }
 
             $results = collect($response->json())
-                ->map(fn ($item) => [
-                    'display_name' => $item['display_name'] ?? '',
-                    'lat' => $item['lat'] ?? null,
-                    'lon' => $item['lon'] ?? null,
-                ])
+                ->map(fn ($item) => $this->mapGeocodeResult(is_array($item) ? $item : []))
                 ->filter(fn ($item) => $item['display_name'] && $item['lat'] && $item['lon'])
                 ->values();
 
@@ -80,6 +87,38 @@ class HoroscopeController extends Controller
 
             return response()->json(['results' => []], 500);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function mapGeocodeResult(array $item): array
+    {
+        $address = is_array($item['address'] ?? null) ? $item['address'] : [];
+        $city = $address['city']
+            ?? $address['town']
+            ?? $address['village']
+            ?? $address['municipality']
+            ?? $address['hamlet']
+            ?? $address['suburb']
+            ?? '';
+        $countryName = (string) ($address['country'] ?? '');
+        $countryCode = strtoupper((string) ($address['country_code'] ?? ''));
+        $displayName = (string) ($item['display_name'] ?? '');
+        $label = $city !== ''
+            ? trim($city.($countryName !== '' ? ', '.$countryName : ''))
+            : $displayName;
+
+        return [
+            'display_name' => $displayName,
+            'label' => $label,
+            'city' => (string) $city,
+            'country' => $countryName,
+            'country_code' => $countryCode,
+            'lat' => $item['lat'] ?? null,
+            'lon' => $item['lon'] ?? null,
+        ];
     }
 
     public function elementInfo(Request $request)

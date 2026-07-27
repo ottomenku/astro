@@ -65,8 +65,8 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700" for="houseSystem">{{ __('horoscope.house_system') }}</label>
                                 <select id="houseSystem" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
-                                    <option value="whole_sign" @selected((auth()->user()->house_system ?? 'placidus') === 'whole_sign')">Whole Sign</option>
                                     <option value="placidus" @selected((auth()->user()->house_system ?? 'placidus') === 'placidus')">Placidus</option>
+                                    <option value="whole_sign" @selected((auth()->user()->house_system ?? 'placidus') === 'whole_sign')">Whole Sign</option>
                                 </select>
                             </div>
 
@@ -362,6 +362,7 @@
                         </div>
 
                         <h3 class="font-semibold mb-3 mt-8">{{ __('horoscope.aspects_tab') }}</h3>
+                        <p class="text-xs text-gray-500 mb-3">{{ __('horoscope.aspects_table_hint') }}</p>
                         <div id="aspectsTable"></div>
                     </div>
 
@@ -435,6 +436,11 @@
         details[open] summary .details-chevron {
             transform: rotate(180deg);
         }
+
+        [data-aspect-icon]:hover circle:nth-child(2) {
+            stroke-width: 3;
+            filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.25));
+        }
     </style>
 
     <script>
@@ -473,6 +479,141 @@
 
             function planetPositionLabel(planet) {
                 return `${planet.sign} ${planet.sign_degree.toFixed(2)}°`;
+            }
+
+            function aspectTypeLabel(def) {
+                return horoscopeI18n.aspect_types?.[def.name] || def.name;
+            }
+
+            function signFromLongitude(longitude) {
+                const norm = normalizeAngle(longitude);
+                const idx = Math.floor(norm / 30) % 12;
+
+                return {
+                    sign: signMeta[idx].name,
+                    sign_degree: norm % 30,
+                };
+            }
+
+            function houseFromChart(chart, longitude) {
+                const houses = chart.houses || [];
+                const houseSystem = houseSystemSelect?.value ?? 'placidus';
+
+                if (houseSystem !== 'placidus' || houses.length < 12) {
+                    const diff = normalizeAngle(longitude - chart.asc);
+                    return Math.floor(diff / 30) + 1;
+                }
+
+                const lonP = longitude;
+                for (let i = 0; i < 12; i++) {
+                    const start = houses[i];
+                    const end = houses[(i + 1) % 12];
+                    const inSeg = start <= end
+                        ? lonP >= start && lonP < end
+                        : lonP >= start || lonP < end;
+                    if (inSeg) {
+                        return i + 1;
+                    }
+                }
+
+                return 12;
+            }
+
+            function enrichChartBodies(chart) {
+                if (!chart) {
+                    return [];
+                }
+
+                const bodies = (chart.planets || [])
+                    .filter((planet) => isChartObjectEnabled(planet.name))
+                    .map((planet) => ({
+                        ...planet,
+                        kind: 'planet',
+                    }));
+
+                const trueNode = (chart.planets || []).find((planet) => planet.name === 'True Node');
+                if (trueNode && isChartObjectEnabled('South Node')) {
+                    const southLon = normalizeAngle(trueNode.longitude + 180);
+                    const southSign = signFromLongitude(southLon);
+                    bodies.push({
+                        name: 'South Node',
+                        longitude: southLon,
+                        sign: southSign.sign,
+                        sign_degree: southSign.sign_degree,
+                        house: houseFromChart(chart, southLon),
+                        retrograde: false,
+                        kind: 'node',
+                    });
+                }
+
+                CHART_ANGLE_DEFS.forEach((point) => {
+                    if (!isChartObjectEnabled(point.name)) {
+                        return;
+                    }
+
+                    const longitude = point.getLongitude(chart);
+                    const sign = signFromLongitude(longitude);
+                    bodies.push({
+                        name: point.name,
+                        longitude,
+                        sign: sign.sign,
+                        sign_degree: sign.sign_degree,
+                        house: point.house,
+                        retrograde: false,
+                        kind: 'angle',
+                    });
+                });
+
+                return dedupeBodiesByName(bodies);
+            }
+
+            function dedupeBodiesByName(bodies) {
+                const seen = new Set();
+                return bodies.filter((body) => {
+                    if (seen.has(body.name)) {
+                        return false;
+                    }
+                    seen.add(body.name);
+                    return true;
+                });
+            }
+
+            function bodySignHouseCell(body) {
+                return `${planetPositionLabel(body)} · ${tr('house')} ${body.house}`;
+            }
+
+            function openChartBodyInfo(body) {
+                const label = planetDisplayName(body);
+                if (body.kind === 'planet' && !['True Node', 'South Node'].includes(body.name)) {
+                    openElementInfoPopup({
+                        type: 'planet',
+                        key: body.name,
+                        title: tr('planet_selection', { name: label }),
+                    });
+                    return;
+                }
+
+                openElementInfoPopup({
+                    type: 'sign',
+                    key: body.sign,
+                    title: `${label} · ${bodySignHouseCell(body)}`,
+                });
+            }
+
+            function calcFixedStarConjunctionRows(chart) {
+                const rows = [];
+                const bodies = enrichChartBodies(chart);
+
+                (chart.fixed_stars || []).forEach((star) => {
+                    bodies.forEach((body) => {
+                        const orb = smallestAngleDiff(star.longitude, body.longitude);
+                        if (orb <= FIXED_STAR_CONJ_ORB) {
+                            rows.push({ star, body, orb });
+                        }
+                    });
+                });
+
+                return rows.sort((a, b) => a.orb - b.orb);
             }
 
             function fixedStarLabel(name) {
@@ -1252,6 +1393,167 @@
             const UNASPECTED_PLANET_OPACITY = 0.32;
             const FIXED_STAR_CONJ_ORB = 2.0;
             const DEFAULT_FIXED_STAR_SYMBOL = '✦';
+            const ASPECT_ICON_RING_R = 7;
+            const ASPECT_SYMBOL_SIZE = 12;
+            const ASPECT_HIT_R = 16;
+            const ASPECT_LINE_T_MIN = 1 / 3;
+            const ASPECT_LINE_T_MAX = 2 / 3;
+            // Egymás átfedése legfeljebb ~1/3 átmérő: középpont-távolság = 2R − R/3 = 4R/3
+            const ASPECT_MIN_SEP = (ASPECT_ICON_RING_R * 8) / 3;
+
+            function layoutAspectIcons(aspects, rotationDeg, guideRadius) {
+                const cx = CHART.cx;
+                const cy = CHART.cy;
+
+                const items = aspects.map((aspect) => {
+                    const a = polarToCartesian(normalizeAngle(aspect.p1.longitude + rotationDeg), guideRadius);
+                    const b = polarToCartesian(normalizeAngle(aspect.p2.longitude + rotationDeg), guideRadius);
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const len = Math.hypot(dx, dy);
+                    const idealX = len > 0 ? (a.x + b.x) / 2 : a.x;
+                    const idealY = len > 0 ? (a.y + b.y) / 2 : a.y;
+
+                    return { aspect, a, b, dx, dy, len, idealX, idealY };
+                });
+
+                function collides(x, y, placed) {
+                    return placed.some((point) => Math.hypot(point.x - x, point.y - y) < ASPECT_MIN_SEP);
+                }
+
+                function overlapScore(x, y, placed) {
+                    return placed.reduce((sum, point) => {
+                        const gap = ASPECT_MIN_SEP - Math.hypot(point.x - x, point.y - y);
+                        return sum + (gap > 0 ? gap : 0);
+                    }, 0);
+                }
+
+                function buildCandidates(item) {
+                    if (item.len < 1) {
+                        return [{ x: item.idealX, y: item.idealY, cost: 0 }];
+                    }
+
+                    const candidates = [];
+                    const steps = 14;
+                    for (let i = 0; i <= steps; i++) {
+                        const t = ASPECT_LINE_T_MIN + (i / steps) * (ASPECT_LINE_T_MAX - ASPECT_LINE_T_MIN);
+                        candidates.push({
+                            x: item.a.x + item.dx * t,
+                            y: item.a.y + item.dy * t,
+                            cost: Math.abs(t - 0.5),
+                        });
+                    }
+
+                    candidates.sort((left, right) => left.cost - right.cost);
+                    return candidates;
+                }
+
+                items.sort(
+                    (left, right) =>
+                        Math.hypot(right.idealX - cx, right.idealY - cy)
+                        - Math.hypot(left.idealX - cx, left.idealY - cy),
+                );
+
+                const placed = [];
+                items.forEach((item) => {
+                    const candidates = buildCandidates(item);
+                    let chosen = candidates.find((candidate) => !collides(candidate.x, candidate.y, placed));
+
+                    if (!chosen) {
+                        chosen = candidates.reduce((best, candidate) => {
+                            const score = overlapScore(candidate.x, candidate.y, placed) + candidate.cost * 0.05;
+                            if (!best || score < best.score) {
+                                return { ...candidate, score };
+                            }
+                            return best;
+                        }, null);
+                    }
+
+                    item.x = chosen.x;
+                    item.y = chosen.y;
+                    placed.push({ x: item.x, y: item.y });
+                });
+
+                return items;
+            }
+
+            function drawClickableAspectIconAt(def, x, y, onClick, strokeOpacity = 0.55, tooltip = '') {
+                const layer = getLayer('aspects');
+                if (!layer) {
+                    return;
+                }
+
+                const g = svgEl('g');
+                g.setAttribute('transform', `translate(${x} ${y})`);
+                g.setAttribute('data-aspect-icon', def.name);
+                g.style.cursor = 'pointer';
+
+                if (tooltip) {
+                    g.appendChild(svgTooltip(tooltip));
+                }
+
+                const hit = svgEl('circle');
+                hit.setAttribute('cx', '0');
+                hit.setAttribute('cy', '0');
+                hit.setAttribute('r', String(ASPECT_HIT_R));
+                hit.setAttribute('fill', 'transparent');
+                g.appendChild(hit);
+
+                const ring = svgEl('circle');
+                ring.setAttribute('cx', '0');
+                ring.setAttribute('cy', '0');
+                ring.setAttribute('r', String(ASPECT_ICON_RING_R));
+                ring.setAttribute('fill', '#ffffff');
+                ring.setAttribute('stroke', def.color);
+                ring.setAttribute('stroke-width', '1.8');
+                ring.setAttribute('opacity', String(Math.min(1, strokeOpacity + 0.35)));
+                g.appendChild(ring);
+
+                const text = svgEl('text');
+                text.setAttribute('x', '0');
+                text.setAttribute('y', '0');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('font-size', String(ASPECT_SYMBOL_SIZE));
+                text.setAttribute('font-weight', '700');
+                text.setAttribute('fill', def.color);
+                text.setAttribute('style', 'pointer-events: none;');
+                text.textContent = def.mark;
+                g.appendChild(text);
+
+                g.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    onClick();
+                });
+
+                layer.appendChild(g);
+            }
+
+            function drawAspectGuideLine(a, b, def, strokeOpacity) {
+                const layer = getLayer('aspects');
+                if (!layer) {
+                    return;
+                }
+
+                const line = svgEl('line');
+                line.setAttribute('x1', a.x);
+                line.setAttribute('y1', a.y);
+                line.setAttribute('x2', b.x);
+                line.setAttribute('y2', b.y);
+                line.setAttribute('stroke', def.color);
+                line.setAttribute('stroke-width', '1.2');
+                line.setAttribute('opacity', String(strokeOpacity * 0.55));
+                line.setAttribute('stroke-linecap', 'round');
+                line.setAttribute('style', 'pointer-events: none;');
+                layer.appendChild(line);
+            }
+
+            const CHART_ANGLE_DEFS = [
+                { name: 'ASC', getLongitude: (chart) => chart.asc, house: 1 },
+                { name: 'MC', getLongitude: (chart) => chart.mc, house: 10 },
+                { name: 'IC', getLongitude: (chart) => normalizeAngle(chart.mc + 180), house: 4 },
+                { name: 'DSC', getLongitude: (chart) => normalizeAngle(chart.asc + 180), house: 7 },
+            ];
 
             function buildAspectedNames(aspects) {
                 const names = new Set();
@@ -1278,6 +1580,20 @@
                 house_system: @json(auth()->user()->house_system ?? 'placidus'),
                 zodiac_mode: @json(auth()->user()->zodiac_mode ?? 'tropical'),
             };
+            let chartDisplaySettings = @json(\App\Support\ChartDisplaySettings::resolve(auth()->user()));
+            const PROFILE_CHART_DISPLAY_SETTINGS = structuredClone(chartDisplaySettings);
+
+            function isChartObjectEnabled(name) {
+                return chartDisplaySettings.objects?.[name]?.enabled !== false;
+            }
+
+            function getChartObjectColor(name) {
+                return chartDisplaySettings.objects?.[name]?.color || null;
+            }
+
+            function filterPlanetsForDisplay(planets) {
+                return (planets || []).filter((planet) => isChartObjectEnabled(planet.name));
+            }
 
             function showSelection(text) {
                 if (!selectionBox) return;
@@ -1447,6 +1763,127 @@
                 return `${planetLabel(p1.name)} ${def.mark} ${planetLabel(p2.name)}`;
             }
 
+            function aspectTooltip(p1, p2, def) {
+                return `${planetLabel(p1.name)} – ${planetLabel(p2.name)} – ${aspectTypeLabel(def)}`;
+            }
+
+            function aspectDrawKey(aspect, rotationDeg, guideRadius) {
+                const a = polarToCartesian(normalizeAngle(aspect.p1.longitude + rotationDeg), guideRadius);
+                const b = polarToCartesian(normalizeAngle(aspect.p2.longitude + rotationDeg), guideRadius);
+                const snap = (value) => Math.round(value);
+                const points = [`${snap(a.x)},${snap(a.y)}`, `${snap(b.x)},${snap(b.y)}`].sort();
+                return `${points[0]}|${points[1]}|${aspect.def.name}`;
+            }
+
+            function aspectLineEndpoints(aspect, rotationDeg, guideRadius) {
+                return {
+                    a: polarToCartesian(normalizeAngle(aspect.p1.longitude + rotationDeg), guideRadius),
+                    b: polarToCartesian(normalizeAngle(aspect.p2.longitude + rotationDeg), guideRadius),
+                };
+            }
+
+            function pointDist(left, right) {
+                return Math.hypot(left.x - right.x, left.y - right.y);
+            }
+
+            function aspectsShareDrawnLine(aspectA, aspectB, rotationDeg, guideRadius) {
+                if (aspectA.def.name !== aspectB.def.name) {
+                    return false;
+                }
+                const lineA = aspectLineEndpoints(aspectA, rotationDeg, guideRadius);
+                const lineB = aspectLineEndpoints(aspectB, rotationDeg, guideRadius);
+                const direct =
+                    pointDist(lineA.a, lineB.a) < 6
+                    && pointDist(lineA.b, lineB.b) < 6;
+                const crossed =
+                    pointDist(lineA.a, lineB.b) < 6
+                    && pointDist(lineA.b, lineB.a) < 6;
+                return direct || crossed;
+            }
+
+            function bodyVisualWeight(body) {
+                if (body.kind === 'planet' && !['True Node', 'South Node'].includes(body.name)) {
+                    return 0;
+                }
+                if (body.kind === 'node') {
+                    return 1;
+                }
+                return 2;
+            }
+
+            function preferVisualAspect(current, candidate) {
+                if (candidate.orb < current.orb - 0.001) {
+                    return candidate;
+                }
+                if (current.orb < candidate.orb - 0.001) {
+                    return current;
+                }
+                const currentWeight = bodyVisualWeight(current.p1) + bodyVisualWeight(current.p2);
+                const candidateWeight = bodyVisualWeight(candidate.p1) + bodyVisualWeight(candidate.p2);
+                return candidateWeight < currentWeight ? candidate : current;
+            }
+
+            function dedupeVisualAspects(aspects, rotationDeg, guideRadius) {
+                const result = [];
+                aspects.forEach((aspect) => {
+                    const key = aspectDrawKey(aspect, rotationDeg, guideRadius);
+                    let existingIndex = result.findIndex(
+                        (entry) => aspectDrawKey(entry, rotationDeg, guideRadius) === key,
+                    );
+                    if (existingIndex < 0) {
+                        existingIndex = result.findIndex(
+                            (entry) => aspectsShareDrawnLine(entry, aspect, rotationDeg, guideRadius),
+                        );
+                    }
+                    if (existingIndex < 0) {
+                        result.push(aspect);
+                        return;
+                    }
+                    result[existingIndex] = preferVisualAspect(result[existingIndex], aspect);
+                });
+                return result;
+            }
+
+            const VISUAL_CONJ_ORB = 2.5;
+
+            function clusterBodiesForVisualAspects(bodies) {
+                const clusters = [];
+
+                bodies.forEach((body) => {
+                    let cluster = clusters.find((entry) =>
+                        entry.bodies.some(
+                            (member) => smallestAngleDiff(body.longitude, member.longitude) <= VISUAL_CONJ_ORB,
+                        ),
+                    );
+                    if (!cluster) {
+                        cluster = { bodies: [] };
+                        clusters.push(cluster);
+                    }
+                    cluster.bodies.push(body);
+                });
+
+                return clusters.map((cluster) => {
+                    const sorted = cluster.bodies.slice().sort((left, right) => {
+                        const weightDiff = bodyVisualWeight(left) - bodyVisualWeight(right);
+                        if (weightDiff !== 0) {
+                            return weightDiff;
+                        }
+                        return left.name.localeCompare(right.name);
+                    });
+                    const representative = { ...sorted[0] };
+                    representative.longitude =
+                        cluster.bodies.reduce((sum, body) => sum + body.longitude, 0)
+                        / cluster.bodies.length;
+                    return representative;
+                });
+            }
+
+            function svgTooltip(text) {
+                const title = svgEl('title');
+                title.textContent = text;
+                return title;
+            }
+
             async function openAspectInfoPopup(context, title) {
                 if (elementInfoBusy || !context) {
                     return;
@@ -1551,15 +1988,23 @@
                 { name: 'Pisces', element: 'water', quality: 'mutable', polarity: 'negative' },
             ];
 
-            const aspectDefs = [
-                { name: 'conjunction', angle: 0, color: '#6c757d', mark: '☌' },
-                // kérés szerint 60°: háromszög
-                { name: 'sextile', angle: 60, color: '#0dcaf0', mark: '△' },
-                // kérés szerint 90°: négyzet
-                { name: 'square', angle: 90, color: '#dc3545', mark: '□' },
-                { name: 'trine', angle: 120, color: '#198754', mark: '△' },
-                { name: 'opposition', angle: 180, color: '#fd7e14', mark: '☍' },
-            ];
+            const ASPECT_META = @json(\App\Support\ChartDisplaySettings::aspectCatalog());
+
+            function getAspectDefs() {
+                const seen = new Set();
+                return ASPECT_META.flatMap((aspect) => {
+                    const settings = chartDisplaySettings.aspects?.[aspect.name];
+                    if (settings?.enabled === false || seen.has(aspect.name)) {
+                        return [];
+                    }
+                    seen.add(aspect.name);
+
+                    return [{
+                        ...aspect,
+                        color: settings?.color || 'gray',
+                    }];
+                });
+            }
 
             function updateModeHint() {
                 const mode = zodiacModeSelect.value;
@@ -1644,9 +2089,7 @@
                 syncHoroscopeViewPanels();
 
                 if (HOROSCOPE_MODE === 'dual') {
-                    if (activeViewName === 'chart') {
-                        bootDualChart();
-                    }
+                    bootDualChart();
                     loadActiveHoroscopeMessageView();
                     return;
                 }
@@ -1661,7 +2104,12 @@
                 if (!houseSystemSelect || !zodiacModeSelect) return;
                 houseSystemSelect.value = PROFILE_CHART_DEFAULTS.house_system;
                 zodiacModeSelect.value = PROFILE_CHART_DEFAULTS.zodiac_mode;
+                chartDisplaySettings = structuredClone(PROFILE_CHART_DISPLAY_SETTINGS);
                 updateModeHint();
+                if (HOROSCOPE_MODE === 'dual') {
+                    calculateDual();
+                    return;
+                }
                 calculate();
             }
 
@@ -1678,100 +2126,171 @@
             [houseSystemSelect, zodiacModeSelect].forEach((el) => {
                 el?.addEventListener('change', () => {
                     updateModeHint();
-                    calculate();
                     if (HOROSCOPE_MODE === 'dual') {
                         calculateDual();
+                        return;
                     }
+                    calculate();
                 });
             });
-            function renderAspectsTable(target, planets) {
-                const aspects = calcAspects(planets)
+            function renderTable(target, chart) {
+                const bodies = enrichChartBodies(chart)
                     .slice()
-                    .sort((a, b) => a.def.angle - b.def.angle || a.orb - b.orb);
+                    .sort((a, b) => {
+                        const order = [...planetsOrder, 'South Node', 'ASC', 'MC', 'IC', 'DSC'];
+                        return order.indexOf(a.name) - order.indexOf(b.name);
+                    });
 
-                if (!aspects.length) {
-                    target.innerHTML = `<div class="text-sm text-gray-500">${tr('no_aspects')}</div>`;
-                    return;
-                }
-
-                const rows = aspects
+                const rows = bodies
                     .map(
-                        ({ p1, p2, def }, index) => `<tr class="cursor-pointer hover:bg-indigo-50" data-aspect-row data-aspect-index="${index}">
-                            <td class="py-2 pr-4">${planetDisplayName(p1)}</td>
-                            <td class="py-2 pr-4 font-semibold" style="color:${def.color}">${def.mark}</td>
-                            <td class="py-2">${planetDisplayName(p2)}</td>
+                        (body, index) => `<tr class="cursor-pointer hover:bg-indigo-50" data-body-row data-body-index="${index}">
+                            <td class="py-2 pr-4">${planetDisplayName(body)}</td>
+                            <td class="py-2 pr-4">${planetPositionLabel(body)}</td>
+                            <td class="py-2">${body.house}</td>
                         </tr>`
                     )
                     .join('');
 
-                target.innerHTML = `<div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead>
-                            <tr class="text-left border-b">
-                                <th class="py-2 pr-4">${tr('planet')}</th>
-                                <th class="py-2 pr-4">${tr('mark')}</th>
-                                <th class="py-2">${tr('planet')}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y">${rows}</tbody>
-                    </table>
-                </div>`;
+                target.innerHTML = `
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="text-left border-b">
+                                    <th class="py-2 pr-4">${tr('object')}</th>
+                                    <th class="py-2 pr-4">${tr('sign')}</th>
+                                    <th class="py-2 pr-4">${tr('house')}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">${rows}</tbody>
+                        </table>
+                    </div>`;
 
-                bindAspectRowClicks(target, (index) => {
-                    const aspect = aspects[index];
-                    if (!aspect) {
-                        return;
-                    }
-                    openAspectInfoPopup(
-                        buildNatalAspectContext(aspect.p1, aspect.p2, aspect.def),
-                        aspectRowTitle(aspect.p1, aspect.p2, aspect.def),
-                    );
+                target.__bodyRows = bodies;
+                target.querySelectorAll('[data-body-row]').forEach((row) => {
+                    row.addEventListener('click', () => {
+                        const body = target.__bodyRows[Number(row.dataset.bodyIndex)];
+                        if (body) {
+                            openChartBodyInfo(body);
+                        }
+                    });
                 });
             }
 
-            function renderCrossAspectsTable(target, planetsA, planetsB) {
-                const aspects = calcCrossAspects(planetsA, planetsB)
+            function bindComplexAspectTableClicks(target) {
+                target?.querySelectorAll('[data-aspect-table-row]').forEach((row) => {
+                    row.addEventListener('click', () => {
+                        const store = target.__complexAspectStore;
+                        if (!store) {
+                            return;
+                        }
+
+                        const index = Number(row.dataset.rowIndex);
+                        const entry = store.entries[index];
+                        if (!entry) {
+                            return;
+                        }
+
+                        if (entry.type === 'aspect') {
+                            const { p1, p2, def } = entry.aspect;
+                            openAspectInfoPopup(
+                                store.isCross
+                                    ? buildCrossAspectContext(p1, p2, def)
+                                    : buildNatalAspectContext(p1, p2, def),
+                                aspectRowTitle(p1, p2, def),
+                            );
+                            return;
+                        }
+
+                        openElementInfoPopup({
+                            type: 'fixed_star',
+                            key: entry.star.name,
+                            title: tr('fixed_star_selection', {
+                                star: fixedStarLabel(entry.star.name),
+                                planet: planetLabel(entry.body.name),
+                                orb: entry.orb.toFixed(2),
+                            }),
+                        });
+                    });
+                });
+            }
+
+            function renderComplexAspectTable(target, chartA, chartB = null) {
+                const isCross = chartB !== null;
+                const bodiesA = enrichChartBodies(chartA);
+                const bodiesB = isCross ? enrichChartBodies(chartB) : null;
+                const aspects = (isCross ? calcCrossAspects(bodiesA, bodiesB) : calcAspects(bodiesA))
                     .slice()
                     .sort((a, b) => a.def.angle - b.def.angle || a.orb - b.orb);
+                const starRows = isCross ? [] : calcFixedStarConjunctionRows(chartA);
+                const entries = [];
+                let htmlRows = '';
 
-                if (!aspects.length) {
+                aspects.forEach(({ p1, p2, def, orb }) => {
+                    const index = entries.length;
+                    entries.push({ type: 'aspect', aspect: { p1, p2, def, orb } });
+                    const cell1Class = isCross ? 'text-blue-700' : '';
+                    const cell2Class = isCross ? 'text-red-700' : '';
+                    htmlRows += `<tr class="cursor-pointer hover:bg-indigo-50" data-aspect-table-row data-row-index="${index}">
+                        <td class="py-2 pr-3 ${cell1Class}">${planetDisplayName(p1)}</td>
+                        <td class="py-2 pr-3 text-xs text-gray-600 ${cell1Class}">${bodySignHouseCell(p1)}</td>
+                        <td class="py-2 pr-3 font-semibold whitespace-nowrap" style="color:${def.color}">${def.mark} <span class="text-xs font-normal text-gray-500">${aspectTypeLabel(def)}</span></td>
+                        <td class="py-2 pr-3 ${cell2Class}">${planetDisplayName(p2)}</td>
+                        <td class="py-2 pr-3 text-xs text-gray-600 ${cell2Class}">${bodySignHouseCell(p2)}</td>
+                        <td class="py-2 pr-2 tabular-nums">${orb.toFixed(2)}°</td>
+                    </tr>`;
+                });
+
+                if (starRows.length) {
+                    htmlRows += `<tr><td colspan="6" class="pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">${tr('fixed_star_conjunctions')}</td></tr>`;
+                    starRows.forEach(({ star, body, orb }) => {
+                        const index = entries.length;
+                        entries.push({ type: 'star', star, body, orb });
+                        htmlRows += `<tr class="cursor-pointer hover:bg-amber-50" data-aspect-table-row data-row-index="${index}">
+                            <td class="py-2 pr-3 text-amber-900">${fixedStarLabel(star.name)}</td>
+                            <td class="py-2 pr-3 text-xs text-gray-600">${planetPositionLabel(star)}</td>
+                            <td class="py-2 pr-3 font-semibold text-gray-700 whitespace-nowrap">☌ <span class="text-xs font-normal">${tr('conjunction')}</span></td>
+                            <td class="py-2 pr-3">${planetDisplayName(body)}</td>
+                            <td class="py-2 pr-3 text-xs text-gray-600">${bodySignHouseCell(body)}</td>
+                            <td class="py-2 pr-2 tabular-nums">${orb.toFixed(2)}°</td>
+                        </tr>`;
+                    });
+                }
+
+                if (!htmlRows) {
                     target.innerHTML = `<div class="text-sm text-gray-500">${tr('no_aspects')}</div>`;
+                    target.__complexAspectStore = null;
                     return;
                 }
 
-                const rows = aspects
-                    .map(
-                        ({ p1, p2, def }, index) => `<tr class="cursor-pointer hover:bg-indigo-50" data-aspect-row data-aspect-index="${index}">
-                            <td class="py-2 pr-4 text-blue-700">${planetDisplayName(p1)}</td>
-                            <td class="py-2 pr-4 font-semibold" style="color:${def.color}">${def.mark}</td>
-                            <td class="py-2 text-red-700">${planetDisplayName(p2)}</td>
-                        </tr>`
-                    )
-                    .join('');
+                const colA = isCross ? tr('dual_a') : tr('object');
+                const colB = isCross ? tr('dual_b') : tr('object');
 
                 target.innerHTML = `<div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="text-left border-b">
-                                <th class="py-2 pr-4">${tr('dual_a')}</th>
-                                <th class="py-2 pr-4">${tr('mark')}</th>
-                                <th class="py-2">${tr('dual_b')}</th>
+                                <th class="py-2 pr-3">${colA}</th>
+                                <th class="py-2 pr-3">${tr('sign')} / ${tr('house')}</th>
+                                <th class="py-2 pr-3">${tr('aspect')}</th>
+                                <th class="py-2 pr-3">${colB}</th>
+                                <th class="py-2 pr-3">${tr('sign')} / ${tr('house')}</th>
+                                <th class="py-2 pr-2">${tr('orb')}</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y">${rows}</tbody>
+                        <tbody class="divide-y">${htmlRows}</tbody>
                     </table>
                 </div>`;
 
-                bindAspectRowClicks(target, (index) => {
-                    const aspect = aspects[index];
-                    if (!aspect) {
-                        return;
-                    }
-                    openAspectInfoPopup(
-                        buildCrossAspectContext(aspect.p1, aspect.p2, aspect.def),
-                        aspectRowTitle(aspect.p1, aspect.p2, aspect.def),
-                    );
-                });
+                target.__complexAspectStore = { entries, isCross };
+                bindComplexAspectTableClicks(target);
+            }
+
+            function renderAspectsTable(target, chart) {
+                renderComplexAspectTable(target, chart);
+            }
+
+            function renderCrossAspectsTable(target, chartA, chartB) {
+                renderComplexAspectTable(target, chartA, chartB);
             }
 
             function localToUtcMs(dateStr, timeStr, offsetHours) {
@@ -1951,33 +2470,7 @@
                 return '';
             }
 
-            function renderTable(target, planets) {
-                const rows = planets
-                    .slice()
-                    .sort((a, b) => planetsOrder.indexOf(a.name) - planetsOrder.indexOf(b.name))
-                    .map(
-                        (planet) => `<tr>
-                            <td>${planetDisplayName(planet)}</td>
-                            <td>${planetPositionLabel(planet)}</td>
-                            <td>${planet.house}</td>
-                        </tr>`
-                    )
-                    .join('');
-
-                target.innerHTML = `
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
-                            <thead>
-                                <tr class="text-left border-b">
-                                    <th class="py-2 pr-4">${tr('planet')}</th>
-                                    <th class="py-2 pr-4">${tr('sign')}</th>
-                                    <th class="py-2 pr-4">${tr('house')}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">${rows}</tbody>
-                        </table>
-                    </div>`;
-            }
+            const PLANET_GLYPH_R = 14;
 
             const CHART = {
                 cx: 200,
@@ -2001,10 +2494,18 @@
                 rAspect: 92,
                 rInner: 86,
 
-                // Bolygók
-                rPlanetBase: 123,
-                rPlanetStep: 12,
+                // Bolygók – a dekád gyűrű (rInner..rAspect) maradjon szabad;
+                // a jelek belső széle a középponttól 2. legközelebbi körig (rAspect) érjen.
+                rPlanetInner: 106,
+                rPlanetConjunctOuter: 128,
+                rPlanetBase: 106,
+                rPlanetMax: 136,
+                rPlanetStep: 10,
             };
+
+            function minPlanetRadius() {
+                return CHART.rAspect + PLANET_GLYPH_R;
+            }
 
             function normalizeAngle(deg) {
                 let v = deg % 360;
@@ -2104,6 +2605,7 @@
 
                 const aspects = svgEl('g');
                 aspects.setAttribute('data-layer', 'aspects');
+                aspects.setAttribute('style', 'pointer-events: all;');
                 chartRoot.appendChild(aspects);
 
                 const planets = svgEl('g');
@@ -2428,7 +2930,7 @@
                 const layer = getLayer('ticks');
                 if (!layer) return;
 
-                planets.forEach((p) => {
+                buildDrawablePlanets(planets).forEach((p) => {
                     const style = getPlanetStyle(p.name, palette);
                     const opacity = planetDisplayOpacity(p.name, aspectedNames);
                     const angle = p.longitude + rotationDeg;
@@ -2449,7 +2951,7 @@
             function drawPlanetMarkers(planets, rotationDeg, palette = 'default', aspectedNames = null) {
                 const layer = getLayer('ticks');
                 if (!layer) return;
-                planets.forEach((p) => {
+                buildDrawablePlanets(planets).forEach((p) => {
                     const style = getPlanetStyle(p.name, palette);
                     const opacity = planetDisplayOpacity(p.name, aspectedNames);
                     const angle = p.longitude + rotationDeg;
@@ -2571,25 +3073,6 @@
                 }
             }
 
-            function drawAspectMark(def, a, b) {
-                const layer = getLayer('labels');
-                if (!layer) return;
-                const mx = (a.x + b.x) / 2;
-                const my = (a.y + b.y) / 2;
-
-                const text = svgEl('text');
-                text.setAttribute('x', mx);
-                text.setAttribute('y', my);
-                text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('dominant-baseline', 'middle');
-                text.setAttribute('font-size', '10');
-                text.setAttribute('fill', def.color);
-                text.setAttribute('font-weight', '700');
-                // csak jel (nincs fokszám)
-                text.textContent = `${def.mark}`;
-                layer.appendChild(text);
-            }
-
             function smallestAngleDiff(a, b) {
                 let d = Math.abs(a - b) % 360;
                 return d > 180 ? 360 - d : d;
@@ -2606,7 +3089,7 @@
                     for (const p2 of planetsB) {
                         const diff = smallestAngleDiff(p1.longitude, p2.longitude);
                         const orbis = aspectOrbis(p1, p2);
-                        for (const def of aspectDefs) {
+                        for (const def of getAspectDefs()) {
                             const delta = Math.abs(diff - def.angle);
                             if (delta <= orbis) {
                                 aspects.push({ p1, p2, def, orb: delta });
@@ -2618,31 +3101,23 @@
                 return aspects;
             }
 
-            function drawCrossAspects(planetsA, planetsB, radius, strokeOpacity, rotationDeg) {
-                const layer = getLayer('aspects');
-                if (!layer) return;
-                const aspects = calcCrossAspects(planetsA, planetsB);
-                aspects.forEach(({ p1, p2, def }, index) => {
-                    const a = polarToCartesian(normalizeAngle(p1.longitude + rotationDeg), radius);
-                    const b = polarToCartesian(normalizeAngle(p2.longitude + rotationDeg), radius);
-                    const line = svgEl('line');
-                    line.setAttribute('x1', a.x);
-                    line.setAttribute('y1', a.y);
-                    line.setAttribute('x2', b.x);
-                    line.setAttribute('y2', b.y);
-                    line.setAttribute('stroke', def.color);
-                    line.setAttribute('stroke-width', '2.2');
-                    line.setAttribute('opacity', String(strokeOpacity));
-                    line.setAttribute('class', 'cursor-pointer');
-                    line.addEventListener('click', () => {
+            function drawCrossAspects(chartA, chartB, radius, strokeOpacity, rotationDeg) {
+                const aspects = dedupeVisualAspects(
+                    calcCrossAspects(
+                        clusterBodiesForVisualAspects(enrichChartBodies(chartA)),
+                        clusterBodiesForVisualAspects(enrichChartBodies(chartB)),
+                    ),
+                    rotationDeg,
+                    radius,
+                );
+                layoutAspectIcons(aspects, rotationDeg, radius).forEach(({ aspect: { p1, p2, def }, a, b, x, y }) => {
+                    drawAspectGuideLine(a, b, def, strokeOpacity);
+                    drawClickableAspectIconAt(def, x, y, () => {
                         openAspectInfoPopup(
                             buildCrossAspectContext(p1, p2, def),
                             aspectRowTitle(p1, p2, def),
                         );
-                    });
-                    layer.appendChild(line);
-
-                    drawAspectMark(def, a, b);
+                    }, strokeOpacity, aspectTooltip(p1, p2, def));
                 });
             }
 
@@ -2654,43 +3129,39 @@
                         const p2 = planets[j];
                         const diff = smallestAngleDiff(p1.longitude, p2.longitude);
                         const orbis = aspectOrbis(p1, p2);
-                        for (const def of aspectDefs) {
+                        let best = null;
+                        for (const def of getAspectDefs()) {
                             const delta = Math.abs(diff - def.angle);
-                            if (delta <= orbis) {
-                                aspects.push({ p1, p2, def, orb: delta });
-                                break;
+                            if (delta <= orbis && (!best || delta < best.orb)) {
+                                best = { p1, p2, def, orb: delta };
                             }
+                        }
+                        if (best) {
+                            aspects.push(best);
                         }
                     }
                 }
                 return aspects;
             }
 
-            function drawAspects(planets, radius, strokeOpacity, rotationDeg) {
-                const layer = getLayer('aspects');
-                if (!layer) return;
-                const aspects = calcAspects(planets);
-                aspects.forEach(({ p1, p2, def }) => {
-                    const a = polarToCartesian(normalizeAngle(p1.longitude + rotationDeg), radius);
-                    const b = polarToCartesian(normalizeAngle(p2.longitude + rotationDeg), radius);
-                    const line = svgEl('line');
-                    line.setAttribute('x1', a.x);
-                    line.setAttribute('y1', a.y);
-                    line.setAttribute('x2', b.x);
-                    line.setAttribute('y2', b.y);
-                    line.setAttribute('stroke', def.color);
-                    line.setAttribute('stroke-width', '2.2');
-                    line.setAttribute('opacity', String(strokeOpacity));
-                    line.setAttribute('class', 'cursor-pointer');
-                    line.addEventListener('click', () => {
+            function calcVisualAspects(bodies) {
+                return calcAspects(clusterBodiesForVisualAspects(bodies));
+            }
+
+            function drawAspects(chart, radius, strokeOpacity, rotationDeg) {
+                const aspects = dedupeVisualAspects(
+                    calcVisualAspects(enrichChartBodies(chart)),
+                    rotationDeg,
+                    radius,
+                );
+                layoutAspectIcons(aspects, rotationDeg, radius).forEach(({ aspect: { p1, p2, def }, a, b, x, y }) => {
+                    drawAspectGuideLine(a, b, def, strokeOpacity);
+                    drawClickableAspectIconAt(def, x, y, () => {
                         openAspectInfoPopup(
                             buildNatalAspectContext(p1, p2, def),
                             aspectRowTitle(p1, p2, def),
                         );
-                    });
-                    layer.appendChild(line);
-
-                    drawAspectMark(def, a, b);
+                    }, strokeOpacity, aspectTooltip(p1, p2, def));
                 });
             }
 
@@ -2708,7 +3179,148 @@
                 Neptune: '♆',
                 Pluto: '♇',
                 'True Node': '☊',
+                'South Node': '☋',
             };
+
+            const SUN_MOON_CONJ_ORB = 8;
+            const PLANET_STRENGTH_ORDER = [
+                'Sun',
+                'Moon',
+                'Mars',
+                'Venus',
+                'Mercury',
+                'Jupiter',
+                'Saturn',
+                'Uranus',
+                'Neptune',
+                'Pluto',
+                'True Node',
+                'South Node',
+            ];
+
+            function planetStrengthRank(name) {
+                const index = PLANET_STRENGTH_ORDER.indexOf(name);
+                return index >= 0 ? index : PLANET_STRENGTH_ORDER.length + 10;
+            }
+
+            function isPlanetAspected(name, aspectedNames) {
+                if (!aspectedNames) {
+                    return true;
+                }
+                return aspectedNames.has(name);
+            }
+
+            function planetOverlapAllowance(nameA, nameB, aspectedNames) {
+                const partial = PLANET_GLYPH_R * 2 * (2 / 3);
+                const full = PLANET_GLYPH_R * 2;
+
+                if (
+                    (nameA === 'Sun' && nameB === 'Moon')
+                    || (nameA === 'Moon' && nameB === 'Sun')
+                ) {
+                    return partial;
+                }
+                if (nameA === 'Sun' || nameB === 'Sun') {
+                    return full;
+                }
+                if (nameA === 'Moon' || nameB === 'Moon') {
+                    return full;
+                }
+
+                const aAsp = isPlanetAspected(nameA, aspectedNames);
+                const bAsp = isPlanetAspected(nameB, aspectedNames);
+                if (aAsp !== bAsp) {
+                    return full;
+                }
+
+                return partial;
+            }
+
+            function planetScreenDistance(lonA, radiusA, lonB, radiusB, rotationDeg) {
+                const a = polarToCartesian(normalizeAngle(lonA + rotationDeg), radiusA);
+                const b = polarToCartesian(normalizeAngle(lonB + rotationDeg), radiusB);
+                return Math.hypot(a.x - b.x, a.y - b.y);
+            }
+
+            function buildDrawablePlanets(planets) {
+                const list = filterPlanetsForDisplay(planets || []);
+                const trueNode = list.find((planet) => planet.name === 'True Node');
+                if (
+                    trueNode
+                    && isChartObjectEnabled('South Node')
+                    && !list.some((planet) => planet.name === 'South Node')
+                ) {
+                    list.push({
+                        name: 'South Node',
+                        longitude: normalizeAngle(trueNode.longitude + 180),
+                        retrograde: false,
+                    });
+                }
+                return list;
+            }
+
+            function canPlacePlanetAtRadius(planet, radius, placed, rotationDeg, aspectedNames) {
+                return placed.every((other) => {
+                    const minDist = planetOverlapAllowance(planet.name, other.planet.name, aspectedNames);
+                    const dist = planetScreenDistance(
+                        planet.longitude,
+                        radius,
+                        other.planet.longitude,
+                        other.radius,
+                        rotationDeg,
+                    );
+                    return dist >= minDist - 0.5;
+                });
+            }
+
+            function layoutPlanetPositions(planets, rotationDeg, aspectedNames, radiusOffset = 0) {
+                const drawable = buildDrawablePlanets(planets);
+                const sun = drawable.find((planet) => planet.name === 'Sun');
+                const moon = drawable.find((planet) => planet.name === 'Moon');
+                const sunMoonConjunct = sun
+                    && moon
+                    && smallestAngleDiff(sun.longitude, moon.longitude) <= SUN_MOON_CONJ_ORB;
+
+                const innerR = Math.max(
+                    (sunMoonConjunct ? CHART.rPlanetConjunctOuter : CHART.rPlanetInner) + radiusOffset,
+                    minPlanetRadius() + radiusOffset,
+                );
+                const maxR = CHART.rPlanetMax + radiusOffset;
+                const step = CHART.rPlanetStep;
+
+                const byStrength = [...drawable].sort(
+                    (left, right) => planetStrengthRank(left.name) - planetStrengthRank(right.name),
+                );
+                const placed = [];
+
+                byStrength.forEach((planet) => {
+                    let radius = innerR;
+
+                    if (planet.name === 'Sun') {
+                        radius = innerR;
+                    } else if (planet.name === 'Moon' && sunMoonConjunct) {
+                        radius = innerR + step;
+                    } else {
+                        let found = false;
+                        for (let candidate = innerR; candidate <= maxR; candidate += step / 2) {
+                            if (canPlacePlanetAtRadius(planet, candidate, placed, rotationDeg, aspectedNames)) {
+                                radius = candidate;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            radius = maxR;
+                        }
+                    }
+
+                    placed.push({ planet, radius });
+                });
+
+                return placed.sort(
+                    (left, right) => planetStrengthRank(right.planet.name) - planetStrengthRank(left.planet.name),
+                );
+            }
 
             function getPlanetStyle(name, palette = 'default') {
                 const base = {
@@ -2728,12 +3340,19 @@
                     return { ...base, fg: '#ffffff', bg: DUAL_RED, ringStroke: '#991b1b', r: 15, fontSize: 18 };
                 }
 
+                if (name === 'Sun') {
+                    return { ...base, fg: '#ffffff', bg: '#facc15', ringStroke: '#ca8a04' };
+                }
+                if (name === 'Moon') {
+                    return { ...base, fg: '#ffffff', bg: '#2563eb', ringStroke: '#1d4ed8' };
+                }
+
+                const customColor = getChartObjectColor(name);
+                if (customColor) {
+                    return { ...base, fg: customColor, ringStroke: customColor };
+                }
+
                 switch (name) {
-                    case 'Sun':
-                        // Nap: sárga alapon fehér
-                        return { ...base, fg: '#ffffff', bg: '#facc15', r: 18, fontSize: 28, ringStroke: '#111827' };
-                    case 'Moon':
-                        return { ...base, fg: '#111827', bg: '#ffffff', r: 16, fontSize: 22 };
                     case 'Mars':
                         return { ...base, fg: '#dc2626' };
                     case 'Venus':
@@ -2755,6 +3374,7 @@
 
                 const g = svgEl('g');
                 g.setAttribute('transform', `translate(${x} ${y})`);
+                g.appendChild(svgTooltip(planetLabel(name)));
 
                 // kör alakú ikon (vékony fekete kör)
                 const ring = svgEl('circle');
@@ -2813,28 +3433,13 @@
                 const radiusOffset = options.radiusOffset ?? 0;
                 const aspectedNames = options.aspectedNames ?? null;
 
-                // kis ütközéskezelés: ha nagyon közel vannak egymáshoz, lépcsőzzük a sugarat
-                const sorted = planets
-                    .slice()
-                    .sort((a, b) => normalizeAngle(a.longitude + rotationDeg) - normalizeAngle(b.longitude + rotationDeg));
-
-                let lastAngle = null;
-                let level = 0;
-                sorted.forEach((planet) => {
+                layoutPlanetPositions(planets, rotationDeg, aspectedNames, radiusOffset).forEach(({ planet, radius }) => {
                     const style = getPlanetStyle(planet.name, palette);
                     const opacity = planetDisplayOpacity(planet.name, aspectedNames);
                     const angle = normalizeAngle(planet.longitude + rotationDeg);
-                    if (lastAngle !== null && smallestAngleDiff(angle, lastAngle) < 8) {
-                        level = (level + 1) % 3;
-                    } else {
-                        level = 0;
-                    }
-                    lastAngle = angle;
+                    const safeRadius = Math.max(radius, minPlanetRadius() + radiusOffset);
+                    const point = polarToCartesian(angle, safeRadius);
 
-                    const radius = CHART.rPlanetBase + radiusOffset + level * CHART.rPlanetStep;
-                    const point = polarToCartesian(angle, radius);
-
-                    // kis jelölő pötty
                     const dot = svgEl('circle');
                     dot.setAttribute('cx', point.x);
                     dot.setAttribute('cy', point.y);
@@ -2847,17 +3452,17 @@
                 });
             }
 
-            function findFixedStarConjunct(starLongitude, planetGroups) {
+            function findFixedStarConjunct(starLongitude, charts) {
                 let best = null;
 
-                planetGroups.forEach(({ planets }) => {
-                    (planets || []).forEach((planet) => {
-                        const orb = smallestAngleDiff(starLongitude, planet.longitude);
+                (charts || []).forEach((chart) => {
+                    enrichChartBodies(chart).forEach((body) => {
+                        const orb = smallestAngleDiff(starLongitude, body.longitude);
                         if (orb > FIXED_STAR_CONJ_ORB) {
                             return;
                         }
                         if (!best || orb < best.orb) {
-                            best = { planet: planet.name, orb };
+                            best = { body, orb };
                         }
                     });
                 });
@@ -2865,13 +3470,18 @@
                 return best;
             }
 
-            function drawFixedStars(stars, planetGroups, rotationDeg) {
+            function drawFixedStars(stars, charts, rotationDeg) {
                 const layer = getLayer('fixedStars');
                 if (!layer || !Array.isArray(stars) || stars.length === 0) {
                     return;
                 }
 
-                const sorted = stars
+                const visibleStars = stars.filter((star) => findFixedStarConjunct(star.longitude, charts));
+                if (!visibleStars.length) {
+                    return;
+                }
+
+                const sorted = visibleStars
                     .slice()
                     .sort((a, b) => normalizeAngle(a.longitude + rotationDeg) - normalizeAngle(b.longitude + rotationDeg));
 
@@ -2879,8 +3489,11 @@
                 let level = 0;
 
                 sorted.forEach((star) => {
-                    const conjunct = findFixedStarConjunct(star.longitude, planetGroups);
-                    const isConjunct = Boolean(conjunct);
+                    const conjunct = findFixedStarConjunct(star.longitude, charts);
+                    if (!conjunct) {
+                        return;
+                    }
+
                     const angle = normalizeAngle(star.longitude + rotationDeg);
 
                     if (lastAngle !== null && smallestAngleDiff(angle, lastAngle) < 6) {
@@ -2892,27 +3505,26 @@
 
                     const radius = CHART.rFixedStar + level * 7;
                     const tickOuter = polarToCartesian(angle, CHART.rZodiacOuter);
-                    const tickInner = polarToCartesian(angle, radius + (isConjunct ? 8 : 6));
+                    const tickInner = polarToCartesian(angle, radius + 8);
                     const tick = svgEl('line');
                     tick.setAttribute('x1', tickOuter.x);
                     tick.setAttribute('y1', tickOuter.y);
                     tick.setAttribute('x2', tickInner.x);
                     tick.setAttribute('y2', tickInner.y);
-                    tick.setAttribute('stroke', isConjunct ? '#dc2626' : '#94a3b8');
-                    tick.setAttribute('stroke-width', isConjunct ? '1.4' : '1');
-                    tick.setAttribute('opacity', isConjunct ? '0.95' : '0.75');
+                    tick.setAttribute('stroke', '#dc2626');
+                    tick.setAttribute('stroke-width', '1.4');
+                    tick.setAttribute('opacity', '0.95');
                     layer.appendChild(tick);
 
                     const point = polarToCartesian(angle, radius);
                     const symbol = star.symbol || DEFAULT_FIXED_STAR_SYMBOL;
-                    const circleR = isConjunct ? 8.5 : 6;
-                    const fontSize = isConjunct ? 9 : 7;
 
                     const g = svgEl('g');
                     g.setAttribute('transform', `translate(${point.x} ${point.y})`);
                     g.style.cursor = 'pointer';
                     g.setAttribute('role', 'button');
                     g.setAttribute('aria-label', fixedStarLabel(star.name));
+                    g.appendChild(svgTooltip(fixedStarLabel(star.name)));
 
                     const hit = svgEl('circle');
                     hit.setAttribute('cx', '0');
@@ -2924,10 +3536,10 @@
                     const ring = svgEl('circle');
                     ring.setAttribute('cx', '0');
                     ring.setAttribute('cy', '0');
-                    ring.setAttribute('r', String(circleR));
-                    ring.setAttribute('fill', isConjunct ? '#fee2e2' : '#fffbeb');
-                    ring.setAttribute('stroke', isConjunct ? '#dc2626' : '#b45309');
-                    ring.setAttribute('stroke-width', isConjunct ? '2' : '1.2');
+                    ring.setAttribute('r', '8.5');
+                    ring.setAttribute('fill', '#fee2e2');
+                    ring.setAttribute('stroke', '#dc2626');
+                    ring.setAttribute('stroke-width', '2');
                     g.appendChild(ring);
 
                     const t = svgEl('text');
@@ -2935,21 +3547,24 @@
                     t.setAttribute('y', '0');
                     t.setAttribute('text-anchor', 'middle');
                     t.setAttribute('dominant-baseline', 'middle');
-                    t.setAttribute('font-size', String(fontSize));
+                    t.setAttribute('font-size', '9');
                     t.setAttribute('font-family', '"Segoe UI Symbol", "Noto Sans Symbols2", "DejaVu Sans", sans-serif');
-                    t.setAttribute('fill', isConjunct ? '#dc2626' : '#92400e');
-                    t.setAttribute('font-weight', isConjunct ? '700' : '600');
+                    t.setAttribute('fill', '#dc2626');
+                    t.setAttribute('font-weight', '700');
                     t.textContent = symbol;
                     g.appendChild(t);
 
                     g.addEventListener('click', (event) => {
                         event.stopPropagation();
-                        const label = fixedStarLabel(star.name);
-                        showFixedStarNameLabel(star.name, angle, radius, isConjunct);
+                        showFixedStarNameLabel(star.name, angle, radius, true);
                         openElementInfoPopup({
                             type: 'fixed_star',
                             key: star.name,
-                            title: label,
+                            title: tr('fixed_star_selection', {
+                                star: fixedStarLabel(star.name),
+                                planet: planetLabel(conjunct.body.name),
+                                orb: conjunct.orb.toFixed(2),
+                            }),
                         });
                     });
 
@@ -3040,7 +3655,10 @@
             function renderDualChart(data) {
                 chartRoot = dualChartSvg;
                 const rotationDeg = normalizeAngle(270 - data.natal.asc);
-                const crossAspects = calcCrossAspects(data.natal.planets, data.transit.planets);
+                const crossAspects = calcCrossAspects(
+                    enrichChartBodies(data.natal),
+                    enrichChartBodies(data.transit),
+                );
                 const aspectedBlue = new Set(crossAspects.map(({ p1 }) => p1.name));
                 const aspectedRed = new Set(crossAspects.map(({ p2 }) => p2.name));
 
@@ -3052,7 +3670,7 @@
                 drawInnerPlanetMarkers(data.natal.planets, rotationDeg, 'blue', aspectedBlue);
                 drawInnerPlanetMarkers(data.transit.planets, rotationDeg, 'red', aspectedRed);
 
-                drawCrossAspects(data.natal.planets, data.transit.planets, CHART.rAspect, 0.65, rotationDeg);
+                drawCrossAspects(data.natal, data.transit, CHART.rAspect, 0.65, rotationDeg);
                 drawPlanets(data.natal.planets, rotationDeg, { palette: 'blue', radiusOffset: 5, aspectedNames: aspectedBlue });
                 drawPlanets(data.transit.planets, rotationDeg, { palette: 'red', radiusOffset: -7, aspectedNames: aspectedRed });
 
@@ -3067,12 +3685,9 @@
                     color: DUAL_RED,
                     radius: CHART.rHouseInner + 8,
                 });
-                drawFixedStars(data.natal.fixed_stars || [], [
-                    { planets: data.natal.planets },
-                    { planets: data.transit.planets },
-                ], rotationDeg);
+                drawFixedStars(data.natal.fixed_stars || [], [data.natal, data.transit], rotationDeg);
                 elevateLayer('fixedStars');
-                elevateLayer('houses');
+                elevateLayer('planets');
             }
 
             async function calculateDual() {
@@ -3109,9 +3724,9 @@
 
                     renderDualChart(data);
                     lastDualHoroscopeData = data;
-                    renderTable(natalTable, data.natal.planets);
-                    renderTable(transitTable, data.transit.planets);
-                    renderCrossAspectsTable(aspectsTable, data.natal.planets, data.transit.planets);
+                    renderTable(natalTable, data.natal);
+                    renderTable(transitTable, data.transit);
+                    renderCrossAspectsTable(aspectsTable, data.natal, data.transit);
                 } catch (error) {
                     if (seq !== dualCalculateSeq) return;
                     console.error('Dual horoscope calculate failed:', error);
@@ -3204,21 +3819,21 @@
                     }
 
                     if (showNatalCheckbox.checked) {
-                        renderTable(natalTable, data.natal.planets);
-                        renderAspectsTable(aspectsTable, data.natal.planets);
+                        renderTable(natalTable, data.natal);
+                        renderComplexAspectTable(aspectsTable, data.natal);
                     } else {
                         natalTable.innerHTML = '';
                         aspectsTable.innerHTML = '';
                     }
                     if (showTransitCheckbox.checked) {
-                        renderTable(transitTable, data.transit.planets);
+                        renderTable(transitTable, data.transit);
                     } else {
                         transitTable.innerHTML = '';
                     }
 
                     // Klasszikus kerék forgatás: ASC balra (9 óránál)
                     const rotationDeg = normalizeAngle(270 - data.natal.asc);
-                    const natalAspects = calcAspects(data.natal.planets);
+                    const natalAspects = calcAspects(enrichChartBodies(data.natal));
                     const aspectedNames = buildAspectedNames(natalAspects);
 
                     clearChart();
@@ -3232,16 +3847,16 @@
 
                     // Aspektusok + bolygók: egyelőre csak natal a keréken
                     if (showNatalCheckbox.checked) {
-                        drawAspects(data.natal.planets, CHART.rAspect, 0.55, rotationDeg);
+                        drawAspects(data.natal, CHART.rAspect, 0.55, rotationDeg);
                         drawPlanets(data.natal.planets, rotationDeg, { aspectedNames });
                     }
 
                     // Házak: a natal cuspok adják az alapot (a bolygók után, hogy a vonalak látszódjanak)
                     drawHousesFromCusps(data.natal.houses, rotationDeg);
                     drawHouseNumbersFromCusps(data.natal.houses, rotationDeg);
-                    drawFixedStars(data.natal.fixed_stars || [], [{ planets: data.natal.planets }], rotationDeg);
+                    drawFixedStars(data.natal.fixed_stars || [], [data.natal], rotationDeg);
                     elevateLayer('fixedStars');
-                    elevateLayer('houses');
+                    elevateLayer('planets');
 
                     lastHoroscopeData = data;
                 } catch (error) {

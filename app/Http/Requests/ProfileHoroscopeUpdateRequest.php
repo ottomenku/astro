@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ChartDisplaySettings;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,7 +18,7 @@ class ProfileHoroscopeUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'house_system' => ['required', 'string', Rule::in(['whole_sign', 'placidus'])],
             'zodiac_mode' => ['required', 'string', Rule::in(['tropical', 'sidereal'])],
             'scoring_profile_id' => ['nullable', 'integer', 'exists:scoring_profiles,id'],
@@ -26,5 +27,11 @@ class ProfileHoroscopeUpdateRequest extends FormRequest
             'current_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'current_lon' => ['nullable', 'numeric', 'between:-180,180'],
         ];
+
+        if ($this->has('chart_display')) {
+            $rules = array_merge($rules, ChartDisplaySettings::validationRules());
+        }
+
+        return $rules;
     }
 }

@@ -21,6 +21,19 @@ class ProfileBirthChartTest extends TestCase
             ->assertSee(__('app.profile_birth_charts'));
     }
 
+    public function test_create_form_shows_hungary_defaults(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.birth-charts.create'))
+            ->assertOk()
+            ->assertSee('value="Budapest"', false)
+            ->assertSee('Europe/Budapest · CET (UTC+1)', false)
+            ->assertSee('value="47.497912"', false)
+            ->assertSee('value="19.040235"', false);
+    }
+
     public function test_user_can_create_birth_chart(): void
     {
         $user = User::factory()->create();

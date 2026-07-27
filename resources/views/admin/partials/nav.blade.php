@@ -15,4 +15,8 @@
        class="{{ request()->routeIs('admin.daily-horoscope.*') ? 'font-semibold text-indigo-600 underline' : 'text-gray-600 hover:text-gray-900' }}">
         Napi horoszkóp
     </a>
+    <a href="{{ route('admin.chart-display.edit') }}"
+       class="{{ request()->routeIs('admin.chart-display.*') ? 'font-semibold text-indigo-600 underline' : 'text-gray-600 hover:text-gray-900' }}">
+        Képlet megjelenés
+    </a>
 </nav>

@@ -39,6 +39,7 @@ class User extends Authenticatable
 
         'house_system',
         'zodiac_mode',
+        'chart_display_settings',
         'scoring_profile_id',
 
         'tier',
@@ -72,6 +73,7 @@ class User extends Authenticatable
             'token_quota_reset_at' => 'datetime',
 
             'birth_datetime_utc' => 'datetime',
+            'chart_display_settings' => 'array',
         ];
     }
 

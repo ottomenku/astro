@@ -135,11 +135,37 @@ class HoroscopeApiTest extends TestCase
         Http::fake();
 
         $this->actingAs($user)
-            ->getJson(route('horoscope.geocode', ['q' => 'ab']))
+            ->getJson(route('horoscope.geocode', ['q' => 'a']))
             ->assertOk()
             ->assertJson(['results' => []]);
 
         Http::assertNothingSent();
+    }
+
+    public function test_geocode_filters_by_country(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::response([
+                [
+                    'display_name' => 'Budapest, Hungary',
+                    'lat' => '47.4979',
+                    'lon' => '19.0402',
+                    'address' => [
+                        'city' => 'Budapest',
+                        'country' => 'Magyarország',
+                        'country_code' => 'hu',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('horoscope.geocode', ['q' => 'Budapest', 'country' => 'hu']))
+            ->assertOk()
+            ->assertJsonPath('results.0.city', 'Budapest')
+            ->assertJsonPath('results.0.country_code', 'HU');
     }
 
     public function test_geocode_returns_results_from_nominatim(): void

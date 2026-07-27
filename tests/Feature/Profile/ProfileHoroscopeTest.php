@@ -3,6 +3,7 @@
 namespace Tests\Feature\Profile;
 
 use App\Models\User;
+use App\Support\ChartDisplaySettings;
 use Database\Seeders\AstrologyScoringProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -65,5 +66,61 @@ class ProfileHoroscopeTest extends TestCase
                 'current_place_label' => 'Budapest',
             ])
             ->assertSessionHasErrors(['house_system', 'zodiac_mode']);
+    }
+
+    public function test_chart_display_settings_can_be_saved(): void
+    {
+        $user = User::factory()->create();
+
+        $payload = [
+            'house_system' => 'placidus',
+            'zodiac_mode' => 'tropical',
+            'chart_display' => $this->chartDisplayFormPayload([
+                'aspects' => [
+                    'opposition' => ['enabled' => false, 'color' => 'maroon'],
+                ],
+                'objects' => [
+                    'Saturn' => ['enabled' => false, 'color' => 'purple'],
+                ],
+            ]),
+        ];
+
+        $this->actingAs($user)
+            ->patch(route('profile.horoscope.update'), $payload)
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('profile.horoscope.edit'));
+
+        $user->refresh();
+        $settings = ChartDisplaySettings::resolve($user);
+
+        $this->assertSame('maroon', $settings['aspects']['opposition']['color']);
+        $this->assertFalse($settings['aspects']['opposition']['enabled']);
+        $this->assertFalse($settings['objects']['Saturn']['enabled']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function chartDisplayFormPayload(array $overrides = []): array
+    {
+        $settings = ChartDisplaySettings::merge(ChartDisplaySettings::defaults(), $overrides);
+        $form = ['aspects' => [], 'objects' => []];
+
+        foreach ($settings['aspects'] as $key => $item) {
+            $form['aspects'][$key] = [
+                'enabled' => $item['enabled'] ? '1' : '0',
+                'color' => $item['color'],
+            ];
+        }
+
+        foreach ($settings['objects'] as $key => $item) {
+            $form['objects'][$key] = [
+                'enabled' => $item['enabled'] ? '1' : '0',
+                'color' => $item['color'],
+            ];
+        }
+
+        return $form;
     }
 }

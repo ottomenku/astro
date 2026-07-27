@@ -7,7 +7,6 @@
                 <div class="max-w-xl mt-6">
                     <header class="mb-6">
                         <h2 class="text-lg font-medium text-gray-900">{{ __('app.birth_chart_add') }}</h2>
-                        <p class="mt-1 text-sm text-gray-600">{{ __('app.profile_birth_charts_hint') }}</p>
                     </header>
 
                     @include('profile.partials.birth-chart-form')
