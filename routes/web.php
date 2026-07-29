@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\AdminAstrologyEntryController;
 use App\Http\Controllers\Admin\AdminConversationController;
 use App\Http\Controllers\Admin\AdminChartDisplayController;
 use App\Http\Controllers\Admin\AdminDailyHoroscopeController;
+use App\Http\Controllers\Admin\AdminHoroscopePromptController;
 use App\Http\Controllers\Admin\AdminPageVisitController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminVisitorController;
@@ -89,6 +90,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/daily-horoscope/regenerate', [AdminDailyHoroscopeController::class, 'regenerate'])->name('daily-horoscope.regenerate');
     Route::put('/daily-horoscope/message', [AdminDailyHoroscopeController::class, 'updateMessage'])->name('daily-horoscope.message.update');
     Route::post('/daily-horoscope/publish', [AdminDailyHoroscopeController::class, 'publish'])->name('daily-horoscope.publish');
+
+    Route::get('/horoscope-prompts', [AdminHoroscopePromptController::class, 'show'])->name('horoscope-prompts.show');
+    Route::put('/horoscope-prompts', [AdminHoroscopePromptController::class, 'update'])->name('horoscope-prompts.update');
 
     Route::get('/chart-display', [AdminChartDisplayController::class, 'edit'])->name('chart-display.edit');
     Route::put('/chart-display', [AdminChartDisplayController::class, 'update'])->name('chart-display.update');

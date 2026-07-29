@@ -15,6 +15,16 @@ class DailyHoroscopeSetting extends Model
         'user_prompt_append',
         'scoring_profile_id',
         'auto_publish',
+        'explanation_sentences_short',
+        'explanation_sentences_normal',
+        'explanation_sentences_detailed',
+        'message_sentences_short',
+        'message_sentences_normal',
+        'message_sentences_detailed',
+        'horoscope_prompt_personal_message',
+        'horoscope_prompt_partnership_message',
+        'horoscope_prompt_personal_explanation',
+        'horoscope_prompt_partnership_explanation',
     ];
 
     protected $casts = [

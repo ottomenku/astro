@@ -189,4 +189,17 @@ The explanation field must contain at least 100 full sentences as flowing prose 
 You may group into thematic paragraphs, but do not use headings or markdown.
 Do not write a shorter text – if signals are sparse, explain why, but keep the 100-sentence minimum.
 TXT,
+
+    'horoscope_profile_explanation_output_format_dynamic' => <<<'TXT'
+--- EXPLANATION OUTPUT FORMAT ---
+
+Reply only with valid JSON: {"explanation":"..."}
+The explanation field should contain approximately :count full sentences as flowing prose with concrete astrological references (planet, sign, house, aspect, rulership, etc.).
+You may group into thematic paragraphs, but do not use headings or markdown.
+Do not write significantly shorter text – if signals are sparse, explain why, but keep the requested length.
+TXT,
+
+    'horoscope_message_summary_length_instruction' => 'The response should total approximately :count full sentences (mainly in the summary section, with other sections proportional).',
+
+    'horoscope_compact_context_intro' => 'Work from the compact astrological summary below. Only the listed top signals and aggregate values are available — do not invent additional chart data.',
 ];

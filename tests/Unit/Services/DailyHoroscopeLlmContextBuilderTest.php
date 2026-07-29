@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Services\DailyHoroscopeLlmContextBuilder;
+use App\Support\HoroscopeTopicCatalog;
 use Tests\TestCase;
 
 class DailyHoroscopeLlmContextBuilderTest extends TestCase
@@ -126,5 +127,47 @@ class DailyHoroscopeLlmContextBuilderTest extends TestCase
         $this->assertSame(7.2, $summary['activity_index']);
         $this->assertArrayNotHasKey('placements', $summary);
         $this->assertArrayNotHasKey('breakdown', $summary);
+    }
+
+    public function test_compact_chart_context_limits_top_signals_and_includes_score_summary(): void
+    {
+        $payload = [
+            'transit' => [
+                'datetime_utc' => '2026-07-14T10:00:00+00:00',
+                'planets' => [
+                    ['name' => 'Sun', 'sign' => 'Leo', 'sign_degree' => 10.0, 'longitude' => 130.0],
+                    ['name' => 'Moon', 'sign' => 'Cancer', 'sign_degree' => 12.0, 'longitude' => 102.0],
+                    ['name' => 'Mars', 'sign' => 'Aries', 'sign_degree' => 12.0, 'longitude' => 12.0],
+                    ['name' => 'Venus', 'sign' => 'Virgo', 'sign_degree' => 2.0, 'longitude' => 152.0],
+                    ['name' => 'Saturn', 'sign' => 'Aries', 'sign_degree' => 18.0, 'longitude' => 18.0],
+                    ['name' => 'Jupiter', 'sign' => 'Gemini', 'sign_degree' => 4.0, 'longitude' => 64.0],
+                ],
+                'fixed_stars' => [],
+            ],
+        ];
+
+        $scoreContext = [
+            'rating_label' => 'erős',
+            'element_fire' => 12.0,
+            'element_earth' => 8.0,
+            'polarity_positive' => 15.0,
+            'polarity_negative' => 5.0,
+            'modality_fixed' => 9.0,
+        ];
+
+        $context = $this->builder->buildCompactChartContext(
+            $payload,
+            $scoreContext,
+            'hu',
+            [HoroscopeTopicCatalog::WORK],
+            6,
+        );
+
+        $this->assertArrayHasKey('score_summary', $context);
+        $this->assertSame('erős', $context['score_summary']['rating']);
+        $this->assertArrayHasKey('top_signals', $context);
+        $this->assertLessThanOrEqual(6, count($context['top_signals']));
+        $this->assertArrayNotHasKey('aspect_signals', $context);
+        $this->assertArrayNotHasKey('significant_placements', $context);
     }
 }

@@ -10,6 +10,7 @@ use App\Services\AstrologyKnowledgeService;
 use App\Services\ChatPrompts;
 use App\Services\ChatService;
 use App\Services\DailyHoroscopeService;
+use App\Support\HoroscopeGenerationOptions;
 use App\Support\HoroscopePeriod;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -209,12 +210,21 @@ class HoroscopeController extends Controller
             'birth_chart_id' => ['nullable', 'integer'],
             'birth_chart_id_a' => ['nullable', 'integer'],
             'birth_chart_id_b' => ['nullable', 'integer'],
+            'user_focus' => ['nullable', 'string', 'max:5000'],
+            'detail_level' => ['nullable', 'string', 'in:short,normal,detailed'],
+            'topics' => ['nullable', 'array'],
+            'topics.*' => ['string', 'in:health,money,relationships,work'],
         ]);
 
         try {
             $service = app(DailyHoroscopeService::class);
             $locale = app()->getLocale();
             $period = HoroscopePeriod::normalize($validated['period'] ?? null);
+            $options = HoroscopeGenerationOptions::fromRequest(
+                $validated['user_focus'] ?? null,
+                $validated['detail_level'] ?? null,
+                $validated['topics'] ?? null,
+            );
 
             if ($validated['mode'] === 'single') {
                 if (empty($validated['birth_chart_id'])) {
@@ -228,6 +238,7 @@ class HoroscopeController extends Controller
                     (int) $validated['birth_chart_id'],
                     $locale,
                     $period,
+                    $options,
                 );
             } else {
                 if (empty($validated['birth_chart_id_a']) || empty($validated['birth_chart_id_b'])) {
@@ -242,10 +253,14 @@ class HoroscopeController extends Controller
                     (int) $validated['birth_chart_id_b'],
                     $locale,
                     $period,
+                    $options,
                 );
             }
 
-            return response()->json($this->horoscopeMessageJson($message));
+            return response()->json(array_merge(
+                $this->horoscopeMessageJson($message),
+                ['tokens_used' => $service->lastTokensUsed()],
+            ));
         } catch (\InvalidArgumentException $error) {
             return response()->json([
                 'error' => $error->getMessage(),
@@ -271,11 +286,20 @@ class HoroscopeController extends Controller
             'chart.datetime_utc' => ['required_with:is_now', 'date'],
             'chart.lat' => ['required_with:is_now', 'numeric', 'between:-90,90'],
             'chart.lon' => ['required_with:is_now', 'numeric', 'between:-180,180'],
+            'user_focus' => ['nullable', 'string', 'max:5000'],
+            'detail_level' => ['nullable', 'string', 'in:short,normal,detailed'],
+            'topics' => ['nullable', 'array'],
+            'topics.*' => ['string', 'in:health,money,relationships,work'],
         ]);
 
         try {
             $service = app(DailyHoroscopeService::class);
             $locale = app()->getLocale();
+            $options = HoroscopeGenerationOptions::fromRequest(
+                $validated['user_focus'] ?? null,
+                $validated['detail_level'] ?? null,
+                $validated['topics'] ?? null,
+            );
 
             if ($validated['mode'] === 'single') {
                 if (! empty($validated['is_now'])) {
@@ -285,12 +309,14 @@ class HoroscopeController extends Controller
                         (float) $validated['chart']['lat'],
                         (float) $validated['chart']['lon'],
                         $locale,
+                        $options,
                     );
                 } elseif (! empty($validated['birth_chart_id'])) {
                     $explanation = $service->personalChartExplanation(
                         $request->user(),
                         (int) $validated['birth_chart_id'],
                         $locale,
+                        $options,
                     );
                 } else {
                     return response()->json([
@@ -309,10 +335,14 @@ class HoroscopeController extends Controller
                     (int) $validated['birth_chart_id_a'],
                     (int) $validated['birth_chart_id_b'],
                     $locale,
+                    $options,
                 );
             }
 
-            return response()->json($this->horoscopeExplanationJson($explanation));
+            return response()->json(array_merge(
+                $this->horoscopeExplanationJson($explanation),
+                ['tokens_used' => $service->lastTokensUsed()],
+            ));
         } catch (\InvalidArgumentException $error) {
             return response()->json([
                 'error' => $error->getMessage(),

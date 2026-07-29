@@ -190,4 +190,17 @@ Az explanation mező legalább 100 teljes mondat legyen, folyó szöveg, konkré
 Bonthatod tematikus bekezdésekre, de ne használj címsorokat vagy markdownot.
 Ne írj rövidebb szöveget – ha kevés a jel, magyarázd el miért, de tartsd meg a 100 mondatos minimumot.
 TXT,
+
+    'horoscope_profile_explanation_output_format_dynamic' => <<<'TXT'
+--- KIFEJTÉS KIMENETI FORMÁTUM ---
+
+Válaszolj kizárólag érvényes JSON objektumként: {"explanation":"..."}
+Az explanation mező körülbelül :count teljes mondat legyen, folyó szöveg, konkrét asztrológiai hivatkozásokkal (bolygó, jegy, ház, fényszög, uralkodó stb.).
+Bonthatod tematikus bekezdésekre, de ne használj címsorokat vagy markdownot.
+Ne írj jelentősen rövidebb szöveget – ha kevés a jel, magyarázd el miért, de tartsd meg a kért hosszt.
+TXT,
+
+    'horoscope_message_summary_length_instruction' => 'A válasz összesen körülbelül :count teljes mondat legyen (főként az összefoglaló szakaszban, a többi rész arányosan).',
+
+    'horoscope_compact_context_intro' => 'Az alábbi tömörített asztrológiai összefoglaló alapján dolgozz. Csak a megadott legfontosabb jelek és összesítő értékek állnak rendelkezésre – ne találj ki további adatot.',
 ];

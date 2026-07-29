@@ -74,6 +74,12 @@ class AdminDailyHoroscopeController extends Controller
             'user_prompt_append' => ['nullable', 'string', 'max:20000'],
             'scoring_profile_id' => ['required', 'integer', Rule::exists('scoring_profiles', 'id')],
             'auto_publish' => ['sometimes', 'boolean'],
+            'explanation_sentences_short' => ['nullable', 'integer', 'min:5', 'max:500'],
+            'explanation_sentences_normal' => ['nullable', 'integer', 'min:5', 'max:500'],
+            'explanation_sentences_detailed' => ['nullable', 'integer', 'min:5', 'max:500'],
+            'message_sentences_short' => ['nullable', 'integer', 'min:5', 'max:500'],
+            'message_sentences_normal' => ['nullable', 'integer', 'min:5', 'max:500'],
+            'message_sentences_detailed' => ['nullable', 'integer', 'min:5', 'max:500'],
         ]);
 
         $locale = Str::lower($validated['locale']);
@@ -81,6 +87,12 @@ class AdminDailyHoroscopeController extends Controller
             'user_prompt_append' => $this->nullableTrim($validated['user_prompt_append'] ?? null),
             'scoring_profile_id' => (int) $validated['scoring_profile_id'],
             'auto_publish' => $request->boolean('auto_publish'),
+            'explanation_sentences_short' => (int) ($validated['explanation_sentences_short'] ?? 20),
+            'explanation_sentences_normal' => (int) ($validated['explanation_sentences_normal'] ?? 50),
+            'explanation_sentences_detailed' => (int) ($validated['explanation_sentences_detailed'] ?? 100),
+            'message_sentences_short' => (int) ($validated['message_sentences_short'] ?? 20),
+            'message_sentences_normal' => (int) ($validated['message_sentences_normal'] ?? 50),
+            'message_sentences_detailed' => (int) ($validated['message_sentences_detailed'] ?? 100),
         ]);
 
         return $this->redirectToTab($locale, 'prompt', 'Beállítások mentve – a kimenő prompt frissítve.');

@@ -5,12 +5,15 @@ namespace App\Services;
 use App\Models\DailyHoroscopeSetting;
 use App\Models\HoroscopeDailyMessage;
 use App\Models\UserDailyHoroscopeSetting;
+use App\Support\HoroscopeGenerationOptions;
+use App\Support\HoroscopeLlmConfig;
 use App\Support\HoroscopePeriod;
 
 class DailyHoroscopePromptBuilder
 {
     public function __construct(
         private readonly DailyHoroscopeLlmContextBuilder $llmContext,
+        private readonly HoroscopeLlmConfig $llmConfig,
     ) {}
 
     public function globalSystemInstructions(string $locale): string
@@ -220,10 +223,16 @@ class DailyHoroscopePromptBuilder
         UserDailyHoroscopeSetting $setting,
         string $locale,
         string $periodType = HoroscopePeriod::DAILY,
+        ?HoroscopeGenerationOptions $options = null,
     ): string {
+        $detailLevel = $options?->detailLevel ?? HoroscopeGenerationOptions::DETAIL_NORMAL;
+        $sentenceCount = $this->llmConfig->sentenceCount('message', $detailLevel, $locale);
+
         return $this->userSystemPromptForPeriod($setting, $locale, $periodType)
             ."\n\n"
-            .__('daily.horoscope_personal_instructions', [], $locale)
+            .$this->llmConfig->prompt(HoroscopeLlmConfig::PROMPT_PERSONAL_MESSAGE, $locale)
+            ."\n\n"
+            .$this->llmConfig->messageSummaryLengthInstruction($sentenceCount, $locale)
             ."\n\n"
             .__('daily.horoscope_personal_period_instructions', [
                 'period' => __('daily.period_'.HoroscopePeriod::normalize($periodType), [], $locale),
@@ -238,10 +247,16 @@ class DailyHoroscopePromptBuilder
     public function horoscopePartnershipSystemPromptForPeriod(
         string $locale,
         string $periodType = HoroscopePeriod::DAILY,
+        ?HoroscopeGenerationOptions $options = null,
     ): string {
+        $detailLevel = $options?->detailLevel ?? HoroscopeGenerationOptions::DETAIL_NORMAL;
+        $sentenceCount = $this->llmConfig->sentenceCount('message', $detailLevel, $locale);
+
         return $this->globalSystemPrompt($locale, $periodType)
             ."\n\n"
-            .__('daily.horoscope_partnership_instructions', [], $locale)
+            .$this->llmConfig->prompt(HoroscopeLlmConfig::PROMPT_PARTNERSHIP_MESSAGE, $locale)
+            ."\n\n"
+            .$this->llmConfig->messageSummaryLengthInstruction($sentenceCount, $locale)
             ."\n\n"
             .__('daily.horoscope_partnership_period_instructions', [
                 'period' => __('daily.period_'.HoroscopePeriod::normalize($periodType), [], $locale),
@@ -262,7 +277,21 @@ class DailyHoroscopePromptBuilder
         array $scoreContext,
         ?array $attachedChartPayload,
         array $periodContext,
+        ?HoroscopeGenerationOptions $options = null,
     ): string {
+        if ($options !== null) {
+            return $this->buildCompactGenerationUserPrompt(
+                $locale,
+                $periodType,
+                $chartPayload,
+                $scoreContext,
+                $attachedChartPayload,
+                null,
+                $periodContext,
+                $options,
+            );
+        }
+
         $prompt = $this->userUserPrompt($setting, $locale, $chartPayload, $scoreContext, $attachedChartPayload);
 
         if ($periodContext === []) {
@@ -306,7 +335,28 @@ class DailyHoroscopePromptBuilder
         array $scoreContext,
         ?array $partnershipContext,
         array $periodContext,
+        ?HoroscopeGenerationOptions $options = null,
+        ?array $attachedChartA = null,
+        ?array $attachedChartB = null,
     ): string {
+        if ($options !== null) {
+            return $this->buildCompactGenerationUserPrompt(
+                $locale,
+                $periodType,
+                $chartPayload,
+                $scoreContext,
+                null,
+                $this->llmContext->buildCompactPartnershipContext(
+                    $attachedChartA,
+                    $attachedChartB,
+                    $locale,
+                    $options->normalizedTopics(),
+                ),
+                $periodContext,
+                $options,
+            );
+        }
+
         $template = trim((string) __('daily.horoscope_partnership_user_prompt', [], $locale));
         $prompt = $this->assembleUserPrompt($locale, $template, $chartPayload, $scoreContext, null);
 
@@ -387,56 +437,175 @@ class DailyHoroscopePromptBuilder
     public function horoscopePersonalProfileExplanationSystemPrompt(
         UserDailyHoroscopeSetting $setting,
         string $locale,
+        ?HoroscopeGenerationOptions $options = null,
     ): string {
-        return $this->horoscopePersonalSystemPrompt($setting, $locale)
+        $detailLevel = $options?->detailLevel ?? HoroscopeGenerationOptions::DETAIL_NORMAL;
+        $sentenceCount = $this->llmConfig->sentenceCount('explanation', $detailLevel, $locale);
+
+        return $this->globalSystemInstructions($locale)
             ."\n\n"
-            .__('daily.horoscope_profile_explanation_output_format', [], $locale)
+            .ChatPrompts::dailyHoroscopeResponseLanguage($locale)
             ."\n\n"
-            .__('daily.horoscope_personal_profile_explanation_instructions', [], $locale);
+            .$this->llmConfig->profileExplanationOutputFormat($sentenceCount, $locale)
+            ."\n\n"
+            .$this->llmConfig->prompt(HoroscopeLlmConfig::PROMPT_PERSONAL_EXPLANATION, $locale);
     }
 
-    public function horoscopePartnershipProfileExplanationSystemPrompt(string $locale): string
+    public function horoscopePartnershipProfileExplanationSystemPrompt(
+        string $locale,
+        ?HoroscopeGenerationOptions $options = null,
+    ): string {
+        $detailLevel = $options?->detailLevel ?? HoroscopeGenerationOptions::DETAIL_NORMAL;
+        $sentenceCount = $this->llmConfig->sentenceCount('explanation', $detailLevel, $locale);
+
+        return $this->globalSystemInstructions($locale)
+            ."\n\n"
+            .ChatPrompts::dailyHoroscopeResponseLanguage($locale)
+            ."\n\n"
+            .$this->llmConfig->profileExplanationOutputFormat($sentenceCount, $locale)
+            ."\n\n"
+            .$this->llmConfig->prompt(HoroscopeLlmConfig::PROMPT_PARTNERSHIP_EXPLANATION, $locale);
+    }
+
+    public function horoscopeCompactMessageSystemPrompt(
+        UserDailyHoroscopeSetting $setting,
+        string $locale,
+        string $periodType,
+        HoroscopeGenerationOptions $options,
+        bool $partnership = false,
+    ): string {
+        $sentenceCount = $this->llmConfig->sentenceCount('message', $options->detailLevel, $locale);
+        $promptKey = $partnership
+            ? HoroscopeLlmConfig::PROMPT_PARTNERSHIP_MESSAGE
+            : HoroscopeLlmConfig::PROMPT_PERSONAL_MESSAGE;
+
+        return $this->globalSystemInstructions($locale)
+            ."\n\n"
+            .$this->globalSystemOutputFormat($locale, $periodType)
+            ."\n\n"
+            .ChatPrompts::dailyHoroscopeResponseLanguage($locale)
+            ."\n\n"
+            .$this->llmConfig->prompt($promptKey, $locale)
+            ."\n\n"
+            .$this->llmConfig->messageSummaryLengthInstruction($sentenceCount, $locale)
+            ."\n\n"
+            .__('daily.horoscope_personal_period_instructions', [
+                'period' => __('daily.period_'.HoroscopePeriod::normalize($periodType), [], $locale),
+            ], $locale);
+    }
+
+    public function appendUserFocus(string $userPrompt, ?HoroscopeGenerationOptions $options, string $locale, string $type = 'explanation'): string
     {
-        return $this->horoscopePartnershipSystemPrompt($locale)
-            ."\n\n"
-            .__('daily.horoscope_profile_explanation_output_format', [], $locale)
-            ."\n\n"
-            .__('daily.horoscope_partnership_profile_explanation_instructions', [], $locale);
+        $block = $this->llmConfig->userFocusBlock($options?->userFocus, $locale, $type);
+        if ($block === '') {
+            return $userPrompt;
+        }
+
+        return rtrim($userPrompt)."\n\n".$block;
     }
 
     /**
      * @param  array<string, mixed>  $attachedPayload
      */
-    public function horoscopePersonalProfileExplanationUserPrompt(array $attachedPayload, string $locale): string
-    {
-        $attachedForLlm = $this->llmContext->buildAttachedContext($attachedPayload, $locale);
+    public function horoscopePersonalProfileExplanationUserPrompt(
+        array $attachedPayload,
+        string $locale,
+        ?HoroscopeGenerationOptions $options = null,
+    ): string {
+        $context = $options !== null
+            ? $this->llmContext->buildCompactAttachedContext(
+                $attachedPayload,
+                $locale,
+                $options->normalizedTopics(),
+            )
+            : $this->llmContext->buildAttachedContext($attachedPayload, $locale);
 
         return implode("\n\n", [
             __('daily.horoscope_personal_profile_explanation_user_intro', [], $locale),
-            __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson($attachedForLlm),
+            __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson($context ?? []),
         ]);
     }
 
     /**
      * @param  array<string, mixed>  $attachedA
      * @param  array<string, mixed>  $attachedB
-     * @param  array<string, mixed>  $partnershipContext
+     * @param  array<string, mixed>|null  $partnershipContext
      */
     public function horoscopePartnershipProfileExplanationUserPrompt(
         array $attachedA,
         array $attachedB,
-        array $partnershipContext,
+        ?array $partnershipContext,
         string $locale,
+        ?HoroscopeGenerationOptions $options = null,
     ): string {
-        return implode("\n\n", [
-            __('daily.horoscope_partnership_profile_explanation_user_intro', [], $locale),
-            __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson([
+        $context = $options !== null
+            ? $this->llmContext->buildCompactPartnershipContext(
+                $attachedA,
+                $attachedB,
+                $locale,
+                $options->normalizedTopics(),
+            )
+            : [
                 'chart_a' => $this->llmContext->buildAttachedContext($attachedA, $locale),
                 'chart_b' => $this->llmContext->buildAttachedContext($attachedB, $locale),
                 'partnership' => $partnershipContext,
-            ]),
+            ];
+
+        return implode("\n\n", [
+            __('daily.horoscope_partnership_profile_explanation_user_intro', [], $locale),
+            __('daily.horoscope_explanation_context_label', [], $locale)."\n".$this->encodeJson($context ?? []),
             __('daily.horoscope_partnership_explanation_user_append', [], $locale),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  array<string, mixed>|null  $attachedChartPayload
+     * @param  array<string, mixed>|null  $partnershipContext
+     * @param  array<string, mixed>  $periodContext
+     */
+    private function buildCompactGenerationUserPrompt(
+        string $locale,
+        string $periodType,
+        array $chartPayload,
+        array $scoreContext,
+        ?array $attachedChartPayload,
+        ?array $partnershipContext,
+        array $periodContext,
+        HoroscopeGenerationOptions $options,
+    ): string {
+        $payload = [
+            'forecast' => $this->llmContext->buildCompactChartContext(
+                $chartPayload,
+                $scoreContext,
+                $locale,
+                $options->normalizedTopics(),
+            ),
+        ];
+
+        if ($attachedChartPayload !== null && $attachedChartPayload !== []) {
+            $payload['birth_chart'] = $this->llmContext->buildCompactAttachedContext(
+                $attachedChartPayload,
+                $locale,
+                $options->normalizedTopics(),
+            );
+        }
+
+        if ($partnershipContext !== null && $partnershipContext !== []) {
+            $payload['partnership'] = $partnershipContext;
+        }
+
+        if ($periodContext !== []) {
+            $payload['period'] = $periodContext;
+        }
+
+        $blocks = [
+            __('daily.horoscope_compact_context_intro', [], $locale),
+            $this->encodeJson($payload),
+        ];
+
+        return implode("\n\n", $blocks);
     }
 
     /**

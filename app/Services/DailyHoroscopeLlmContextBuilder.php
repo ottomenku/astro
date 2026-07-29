@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Enums\ZodiacSign;
+use App\Support\HoroscopeTopicCatalog;
 
 class DailyHoroscopeLlmContextBuilder
 {
+    public const DEFAULT_MAX_SIGNALS = 6;
     private const ASPECT_DEFS = [
         ['type' => 'conjunction', 'angle' => 0, 'orb' => 8.0, 'harmonic' => null],
         ['type' => 'sextile', 'angle' => 60, 'orb' => 6.0, 'harmonic' => true],
@@ -192,6 +194,180 @@ class DailyHoroscopeLlmContextBuilder
         }
 
         return array_filter($summary, fn ($value) => $value !== null && $value !== []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayload
+     * @param  array<string, mixed>  $scoreContext
+     * @param  list<string>  $topics
+     * @return array<string, mixed>
+     */
+    public function buildCompactChartContext(
+        array $chartPayload,
+        array $scoreContext,
+        string $locale,
+        array $topics = [],
+        int $maxSignals = self::DEFAULT_MAX_SIGNALS,
+    ): array {
+        $full = $this->buildChartContext($chartPayload, $locale);
+        $pairwise = (array) data_get($full, 'aspect_signals.pairwise', []);
+        $topics = HoroscopeTopicCatalog::normalizeTopics($topics);
+
+        return [
+            'datetime_utc' => $full['datetime_utc'] ?? null,
+            'score_summary' => $this->buildScoreSummary($scoreContext),
+            'top_signals' => $this->selectTopSignals($pairwise, $topics, $maxSignals),
+            'topics' => array_map(
+                fn (string $topic) => HoroscopeTopicCatalog::label($topic, $locale),
+                $topics,
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $attachedPayload
+     * @param  list<string>  $topics
+     * @return array<string, mixed>|null
+     */
+    public function buildCompactAttachedContext(
+        ?array $attachedPayload,
+        string $locale,
+        array $topics = [],
+        int $maxSignals = self::DEFAULT_MAX_SIGNALS,
+    ): ?array {
+        if ($attachedPayload === null || $attachedPayload === []) {
+            return null;
+        }
+
+        $chart = (array) ($attachedPayload['chart'] ?? $attachedPayload);
+        $score = (array) ($attachedPayload['score'] ?? []);
+
+        return [
+            'label' => $attachedPayload['label'] ?? null,
+            'gender' => $attachedPayload['gender'] ?? null,
+            'chart' => $this->buildCompactChartContext($chart, $score, $locale, $topics, $maxSignals),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $chartPayloadA
+     * @param  array<string, mixed>|null  $chartPayloadB
+     * @param  list<string>  $topics
+     * @return array<string, mixed>|null
+     */
+    public function buildCompactPartnershipContext(
+        ?array $chartPayloadA,
+        ?array $chartPayloadB,
+        string $locale,
+        array $topics = [],
+        int $maxSignals = self::DEFAULT_MAX_SIGNALS,
+    ): ?array {
+        if ($chartPayloadA === null || $chartPayloadB === null) {
+            return null;
+        }
+
+        return [
+            'chart_a' => $this->buildCompactAttachedContext($chartPayloadA, $locale, $topics, $maxSignals),
+            'chart_b' => $this->buildCompactAttachedContext($chartPayloadB, $locale, $topics, $maxSignals),
+            'synastry_top_signals' => $this->buildCompactSynastrySignals($chartPayloadA, $chartPayloadB, $locale, $topics, $maxSignals),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartPayloadA
+     * @param  array<string, mixed>  $chartPayloadB
+     * @param  list<string>  $topics
+     * @return list<array<string, mixed>>
+     */
+    public function buildCompactSynastrySignals(
+        array $chartPayloadA,
+        array $chartPayloadB,
+        string $locale,
+        array $topics = [],
+        int $maxSignals = self::DEFAULT_MAX_SIGNALS,
+    ): array {
+        $chartA = (array) ($chartPayloadA['chart'] ?? $chartPayloadA);
+        $chartB = (array) ($chartPayloadB['chart'] ?? $chartPayloadB);
+        $planetsA = $this->normalizePlanets((array) ($this->resolveDailyChart($chartA)['planets'] ?? []));
+        $planetsB = $this->normalizePlanets((array) ($this->resolveDailyChart($chartB)['planets'] ?? []));
+        $aspects = $this->detectAspects($planetsA, $planetsB);
+        $bodiesById = $this->indexBodies(array_merge($planetsA, $planetsB));
+        $scored = $this->scoreAspects($aspects, $bodiesById, []);
+        $pairwise = $this->buildPairwiseAspects($scored, $bodiesById, $locale);
+
+        return $this->selectTopSignals($pairwise, HoroscopeTopicCatalog::normalizeTopics($topics), $maxSignals);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $pairwise
+     * @param  list<string>  $topics
+     * @return list<array<string, mixed>>
+     */
+    private function selectTopSignals(array $pairwise, array $topics, int $maxSignals): array
+    {
+        if ($pairwise === []) {
+            return [];
+        }
+
+        $topics = HoroscopeTopicCatalog::normalizeTopics($topics);
+        $specificTopics = count($topics) < count(HoroscopeTopicCatalog::ALL);
+
+        foreach ($pairwise as $index => $signal) {
+            $body1 = (string) data_get($signal, 'body1.id', '');
+            $body2 = (string) data_get($signal, 'body2.id', '');
+            $topicScore = 0;
+
+            if ($specificTopics) {
+                $matchesA = HoroscopeTopicCatalog::bodyMatchesTopics($body1, $topics);
+                $matchesB = HoroscopeTopicCatalog::bodyMatchesTopics($body2, $topics);
+
+                if ($matchesA && $matchesB) {
+                    $topicScore = 3;
+                } elseif ($matchesA || $matchesB) {
+                    $topicScore = 2;
+                }
+            }
+
+            $pairwise[$index]['_rank'] = ($topicScore * 1000)
+                + ((5 - (int) ($signal['priority'] ?? 4)) * 100)
+                - (float) ($signal['orb'] ?? 0);
+        }
+
+        usort($pairwise, fn (array $left, array $right): int => ($right['_rank'] ?? 0) <=> ($left['_rank'] ?? 0));
+
+        if ($specificTopics) {
+            $matching = array_values(array_filter(
+                $pairwise,
+                static fn (array $signal): bool => ($signal['_rank'] ?? 0) >= 2000,
+            ));
+            $selected = array_slice($matching, 0, $maxSignals);
+
+            if (count($selected) < $maxSignals) {
+                $selectedKeys = array_map(static fn (array $signal): string => (string) ($signal['description'] ?? ''), $selected);
+                foreach ($pairwise as $signal) {
+                    $description = (string) ($signal['description'] ?? '');
+                    if (in_array($description, $selectedKeys, true)) {
+                        continue;
+                    }
+                    $selected[] = $signal;
+                    $selectedKeys[] = $description;
+                    if (count($selected) >= $maxSignals) {
+                        break;
+                    }
+                }
+            }
+
+            $pairwise = $selected;
+        } else {
+            $pairwise = array_slice($pairwise, 0, $maxSignals);
+        }
+
+        return array_values(array_map(static fn (array $signal): array => [
+            'description' => $signal['description'] ?? null,
+            'priority' => $signal['priority'] ?? null,
+            'type' => $signal['type'] ?? null,
+            'orb' => $signal['orb'] ?? null,
+        ], $pairwise));
     }
 
     /**

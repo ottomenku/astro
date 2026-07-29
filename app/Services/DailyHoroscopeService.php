@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Models\UserDailyHoroscopeMessage;
 use App\Models\UserDailyHoroscopeSetting;
 use App\Models\UserHoroscope;
+use App\Support\HoroscopeGenerationOptions;
+use App\Support\HoroscopeLlmConfig;
 use App\Support\HoroscopePeriod;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -21,13 +23,22 @@ use Illuminate\Support\Str;
 
 class DailyHoroscopeService
 {
+    private int $lastTokensUsed = 0;
+
     public function __construct(
         private readonly HoroscopeCalculator $calculator,
         private readonly AstrologyChartScoringService $scoring,
         private readonly DailyHoroscopePromptBuilder $promptBuilder,
+        private readonly DailyHoroscopeLlmContextBuilder $llmContext,
+        private readonly HoroscopeLlmConfig $llmConfig,
         private readonly PeriodHoroscopeContextBuilder $periodContext,
         private readonly OpenAIClient $openAi,
     ) {}
+
+    public function lastTokensUsed(): int
+    {
+        return $this->lastTokensUsed;
+    }
 
     /**
      * Nyitólap: publikált globális vagy személyes üzenet (napi / heti / havi).
@@ -57,10 +68,11 @@ class DailyHoroscopeService
         int $birthChartId,
         ?string $locale = null,
         ?string $periodType = null,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeDailyMessage {
         $locale = Str::lower(trim($locale ?? app()->getLocale()));
         $bounds = HoroscopePeriod::bounds($periodType);
-        $cacheKey = $this->personalCacheKey($birthChartId);
+        $cacheKey = $this->personalCacheKey($birthChartId).($options?->cacheSuffix() ?? '');
         $birthChart = $this->resolveUserBirthChart($user, $birthChartId);
 
         $cached = $this->findHoroscopeMessage($user->id, $locale, $cacheKey, $bounds);
@@ -69,21 +81,22 @@ class DailyHoroscopeService
         }
 
         $lockKey = sprintf(
-            'horoscope-message:personal:%d:%s:%s:%s:%s',
+            'horoscope-message:personal:%d:%s:%s:%s:%s%s',
             $user->id,
             $birthChartId,
             $bounds['type'],
             $bounds['start']->toDateString(),
             $locale,
+            $options?->cacheSuffix() ?? '',
         );
 
-        return Cache::lock($lockKey, 180)->block(180, function () use ($user, $birthChart, $bounds, $locale, $cacheKey) {
+        return Cache::lock($lockKey, 180)->block(180, function () use ($user, $birthChart, $bounds, $locale, $cacheKey, $options) {
             $existing = $this->findHoroscopeMessage($user->id, $locale, $cacheKey, $bounds);
             if ($existing) {
                 return $existing;
             }
 
-            return $this->generateHoroscopePersonal($user, $birthChart, $bounds, $locale, $cacheKey);
+            return $this->generateHoroscopePersonal($user, $birthChart, $bounds, $locale, $cacheKey, $options);
         });
     }
 
@@ -93,6 +106,7 @@ class DailyHoroscopeService
         int $birthChartIdB,
         ?string $locale = null,
         ?string $periodType = null,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeDailyMessage {
         if ($birthChartIdA === $birthChartIdB) {
             throw new \InvalidArgumentException('A párkapcsolati napi üzenethez két különböző születési adat kell.');
@@ -101,7 +115,7 @@ class DailyHoroscopeService
         $locale = Str::lower(trim($locale ?? app()->getLocale()));
         $bounds = HoroscopePeriod::bounds($periodType);
         [$firstId, $secondId] = $this->sortedBirthChartPair($birthChartIdA, $birthChartIdB);
-        $cacheKey = $this->partnershipCacheKey($firstId, $secondId);
+        $cacheKey = $this->partnershipCacheKey($firstId, $secondId).($options?->cacheSuffix() ?? '');
         $chartA = $this->resolveUserBirthChart($user, $firstId);
         $chartB = $this->resolveUserBirthChart($user, $secondId);
 
@@ -111,21 +125,22 @@ class DailyHoroscopeService
         }
 
         $lockKey = sprintf(
-            'horoscope-message:partnership:%d:%s:%s:%s:%s',
+            'horoscope-message:partnership:%d:%s:%s:%s:%s%s',
             $user->id,
             $cacheKey,
             $bounds['type'],
             $bounds['start']->toDateString(),
             $locale,
+            $options?->cacheSuffix() ?? '',
         );
 
-        return Cache::lock($lockKey, 180)->block(180, function () use ($user, $chartA, $chartB, $bounds, $locale, $cacheKey, $firstId, $secondId) {
+        return Cache::lock($lockKey, 180)->block(180, function () use ($user, $chartA, $chartB, $bounds, $locale, $cacheKey, $firstId, $secondId, $options) {
             $existing = $this->findHoroscopeMessage($user->id, $locale, $cacheKey, $bounds);
             if ($existing) {
                 return $existing;
             }
 
-            return $this->generateHoroscopePartnership($user, $chartA, $chartB, $bounds, $locale, $cacheKey, $firstId, $secondId);
+            return $this->generateHoroscopePartnership($user, $chartA, $chartB, $bounds, $locale, $cacheKey, $firstId, $secondId, $options);
         });
     }
 
@@ -150,10 +165,14 @@ class DailyHoroscopeService
         });
     }
 
-    public function personalChartExplanation(User $user, int $birthChartId, ?string $locale = null): HoroscopeChartExplanation
-    {
+    public function personalChartExplanation(
+        User $user,
+        int $birthChartId,
+        ?string $locale = null,
+        ?HoroscopeGenerationOptions $options = null,
+    ): HoroscopeChartExplanation {
         $locale = Str::lower(trim($locale ?? app()->getLocale()));
-        $cacheKey = $this->personalProfileCacheKey($birthChartId);
+        $cacheKey = $this->personalProfileCacheKey($birthChartId).($options?->cacheSuffix() ?? '');
         $birthChart = $this->resolveUserBirthChart($user, $birthChartId);
 
         $cached = $this->findChartExplanation($user->id, $locale, $cacheKey);
@@ -162,19 +181,20 @@ class DailyHoroscopeService
         }
 
         $lockKey = sprintf(
-            'horoscope-chart-explanation:personal:%d:%d:%s',
+            'horoscope-chart-explanation:personal:%d:%d:%s%s',
             $user->id,
             $birthChartId,
             $locale,
+            $options?->cacheSuffix() ?? '',
         );
 
-        return Cache::lock($lockKey, 900)->block(900, function () use ($user, $birthChart, $locale, $cacheKey, $birthChartId) {
+        return Cache::lock($lockKey, 900)->block(900, function () use ($user, $birthChart, $locale, $cacheKey, $birthChartId, $options) {
             $existing = $this->findChartExplanation($user->id, $locale, $cacheKey);
             if ($existing) {
                 return $existing;
             }
 
-            return $this->generatePersonalChartExplanation($user, $birthChart, $locale, $cacheKey, $birthChartId);
+            return $this->generatePersonalChartExplanation($user, $birthChart, $locale, $cacheKey, $birthChartId, $options);
         });
     }
 
@@ -184,9 +204,10 @@ class DailyHoroscopeService
         float $lat,
         float $lon,
         ?string $locale = null,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeChartExplanation {
         $locale = Str::lower(trim($locale ?? app()->getLocale()));
-        $cacheKey = $this->personalNowProfileCacheKey($datetimeUtc, $lat, $lon);
+        $cacheKey = $this->personalNowProfileCacheKey($datetimeUtc, $lat, $lon).($options?->cacheSuffix() ?? '');
 
         $cached = $this->findChartExplanation($user->id, $locale, $cacheKey);
         if ($cached) {
@@ -194,19 +215,20 @@ class DailyHoroscopeService
         }
 
         $lockKey = sprintf(
-            'horoscope-chart-explanation:personal-now:%d:%s:%s',
+            'horoscope-chart-explanation:personal-now:%d:%s:%s%s',
             $user->id,
             $cacheKey,
             $locale,
+            $options?->cacheSuffix() ?? '',
         );
 
-        return Cache::lock($lockKey, 900)->block(900, function () use ($user, $datetimeUtc, $lat, $lon, $locale, $cacheKey) {
+        return Cache::lock($lockKey, 900)->block(900, function () use ($user, $datetimeUtc, $lat, $lon, $locale, $cacheKey, $options) {
             $existing = $this->findChartExplanation($user->id, $locale, $cacheKey);
             if ($existing) {
                 return $existing;
             }
 
-            return $this->generatePersonalNowChartExplanation($user, $datetimeUtc, $lat, $lon, $locale, $cacheKey);
+            return $this->generatePersonalNowChartExplanation($user, $datetimeUtc, $lat, $lon, $locale, $cacheKey, $options);
         });
     }
 
@@ -215,6 +237,7 @@ class DailyHoroscopeService
         int $birthChartIdA,
         int $birthChartIdB,
         ?string $locale = null,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeChartExplanation {
         if ($birthChartIdA === $birthChartIdB) {
             throw new \InvalidArgumentException('A párkapcsolati kifejtéshez két különböző születési adat kell.');
@@ -222,7 +245,7 @@ class DailyHoroscopeService
 
         $locale = Str::lower(trim($locale ?? app()->getLocale()));
         [$firstId, $secondId] = $this->sortedBirthChartPair($birthChartIdA, $birthChartIdB);
-        $cacheKey = $this->partnershipProfileCacheKey($firstId, $secondId);
+        $cacheKey = $this->partnershipProfileCacheKey($firstId, $secondId).($options?->cacheSuffix() ?? '');
         $chartA = $this->resolveUserBirthChart($user, $firstId);
         $chartB = $this->resolveUserBirthChart($user, $secondId);
 
@@ -232,19 +255,20 @@ class DailyHoroscopeService
         }
 
         $lockKey = sprintf(
-            'horoscope-chart-explanation:partnership:%d:%s:%s',
+            'horoscope-chart-explanation:partnership:%d:%s:%s%s',
             $user->id,
             $cacheKey,
             $locale,
+            $options?->cacheSuffix() ?? '',
         );
 
-        return Cache::lock($lockKey, 900)->block(900, function () use ($user, $chartA, $chartB, $locale, $cacheKey, $firstId, $secondId) {
+        return Cache::lock($lockKey, 900)->block(900, function () use ($user, $chartA, $chartB, $locale, $cacheKey, $firstId, $secondId, $options) {
             $existing = $this->findChartExplanation($user->id, $locale, $cacheKey);
             if ($existing) {
                 return $existing;
             }
 
-            return $this->generatePartnershipChartExplanation($user, $chartA, $chartB, $locale, $cacheKey, $firstId, $secondId);
+            return $this->generatePartnershipChartExplanation($user, $chartA, $chartB, $locale, $cacheKey, $firstId, $secondId, $options);
         });
     }
 
@@ -737,6 +761,7 @@ class DailyHoroscopeService
         array $bounds,
         string $locale,
         string $cacheKey,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeDailyMessage {
         $settings = UserDailyHoroscopeSetting::forUser($user);
         $settings->load(['scoringProfile']);
@@ -758,15 +783,21 @@ class DailyHoroscopeService
             : [];
 
         $generated = $this->generateWithLlm(
-            system: $this->promptBuilder->horoscopePersonalSystemPromptForPeriod($settings, $locale, $bounds['type']),
-            userPrompt: $this->promptBuilder->horoscopePersonalUserPromptForPeriod(
-                $settings,
+            system: $this->promptBuilder->horoscopeCompactMessageSystemPrompt($settings, $locale, $bounds['type'], $options ?? HoroscopeGenerationOptions::fromRequest(null, null), false),
+            userPrompt: $this->promptBuilder->appendUserFocus(
+                $this->promptBuilder->horoscopePersonalUserPromptForPeriod(
+                    $settings,
+                    $locale,
+                    $bounds['type'],
+                    $chartPayload,
+                    $scoreContext,
+                    $attachedPayload,
+                    $periodContext,
+                    $options,
+                ),
+                $options,
                 $locale,
-                $bounds['type'],
-                $chartPayload,
-                $scoreContext,
-                $attachedPayload,
-                $periodContext,
+                'message',
             ),
             user: $user,
             options: $this->llmOptionsForPeriod($bounds['type']),
@@ -804,6 +835,7 @@ class DailyHoroscopeService
         string $cacheKey,
         int $firstId,
         int $secondId,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeDailyMessage {
         $settings = UserDailyHoroscopeSetting::forUser($user);
         $settings->load(['scoringProfile']);
@@ -814,7 +846,12 @@ class DailyHoroscopeService
         $chartPayload = $this->calculateChart($chartDatetimeUtc);
         $attachedA = $this->buildAttachedPayloadFromBirthChart($user, $chartA, $profile);
         $attachedB = $this->buildAttachedPayloadFromBirthChart($user, $chartB, $profile);
-        $partnershipContext = app(DailyHoroscopeLlmContextBuilder::class)->buildPartnershipContext($attachedA, $attachedB, $locale);
+        $partnershipContext = $this->llmContext->buildCompactPartnershipContext(
+            $attachedA,
+            $attachedB,
+            $locale,
+            $options?->normalizedTopics() ?? [],
+        );
         $periodContext = $this->periodContext->build(
             $bounds['type'],
             $bounds['start'],
@@ -826,15 +863,25 @@ class DailyHoroscopeService
             ? $this->scoring->scorePayloadForProfile($chartPayload, $profile)
             : [];
 
+        $partnershipOptions = $options ?? HoroscopeGenerationOptions::fromRequest(null, null);
+
         $generated = $this->generateWithLlm(
-            system: $this->promptBuilder->horoscopePartnershipSystemPromptForPeriod($locale, $bounds['type']),
-            userPrompt: $this->promptBuilder->horoscopePartnershipUserPromptForPeriod(
+            system: $this->promptBuilder->horoscopeCompactMessageSystemPrompt($settings, $locale, $bounds['type'], $partnershipOptions, true),
+            userPrompt: $this->promptBuilder->appendUserFocus(
+                $this->promptBuilder->horoscopePartnershipUserPromptForPeriod(
+                    $locale,
+                    $bounds['type'],
+                    $chartPayload,
+                    $scoreContext,
+                    $partnershipContext,
+                    $periodContext,
+                    $options,
+                    $attachedA,
+                    $attachedB,
+                ),
+                $options,
                 $locale,
-                $bounds['type'],
-                $chartPayload,
-                $scoreContext,
-                $partnershipContext,
-                $periodContext,
+                'message',
             ),
             user: $user,
             options: $this->llmOptionsForPeriod($bounds['type']),
@@ -992,16 +1039,23 @@ class DailyHoroscopeService
         string $locale,
         string $cacheKey,
         int $birthChartId,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeChartExplanation {
         $settings = UserDailyHoroscopeSetting::forUser($user);
         $settings->load(['scoringProfile']);
         $attachedPayload = $this->buildAttachedPayloadFromBirthChart($user, $birthChart, $settings->resolvedScoringProfile());
 
         $explanation = $this->generateProfileExplanationWithLlm(
-            system: $this->promptBuilder->horoscopePersonalProfileExplanationSystemPrompt($settings, $locale),
-            userPrompt: $this->promptBuilder->horoscopePersonalProfileExplanationUserPrompt($attachedPayload, $locale),
+            system: $this->promptBuilder->horoscopePersonalProfileExplanationSystemPrompt($settings, $locale, $options),
+            userPrompt: $this->promptBuilder->appendUserFocus(
+                $this->promptBuilder->horoscopePersonalProfileExplanationUserPrompt($attachedPayload, $locale, $options),
+                $options,
+                $locale,
+            ),
             user: $user,
             partnership: false,
+            options: $options,
+            locale: $locale,
         );
 
         return $this->storeChartExplanation([
@@ -1025,6 +1079,7 @@ class DailyHoroscopeService
         float $lon,
         string $locale,
         string $cacheKey,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeChartExplanation {
         $settings = UserDailyHoroscopeSetting::forUser($user);
         $settings->load(['scoringProfile']);
@@ -1038,10 +1093,16 @@ class DailyHoroscopeService
         );
 
         $explanation = $this->generateProfileExplanationWithLlm(
-            system: $this->promptBuilder->horoscopePersonalProfileExplanationSystemPrompt($settings, $locale),
-            userPrompt: $this->promptBuilder->horoscopePersonalProfileExplanationUserPrompt($attachedPayload, $locale),
+            system: $this->promptBuilder->horoscopePersonalProfileExplanationSystemPrompt($settings, $locale, $options),
+            userPrompt: $this->promptBuilder->appendUserFocus(
+                $this->promptBuilder->horoscopePersonalProfileExplanationUserPrompt($attachedPayload, $locale, $options),
+                $options,
+                $locale,
+            ),
             user: $user,
             partnership: false,
+            options: $options,
+            locale: $locale,
         );
 
         return $this->storeChartExplanation([
@@ -1071,24 +1132,37 @@ class DailyHoroscopeService
         string $cacheKey,
         int $firstId,
         int $secondId,
+        ?HoroscopeGenerationOptions $options = null,
     ): HoroscopeChartExplanation {
         $settings = UserDailyHoroscopeSetting::forUser($user);
         $settings->load(['scoringProfile']);
         $profile = $settings->resolvedScoringProfile();
         $attachedA = $this->buildAttachedPayloadFromBirthChart($user, $chartA, $profile);
         $attachedB = $this->buildAttachedPayloadFromBirthChart($user, $chartB, $profile);
-        $partnershipContext = app(DailyHoroscopeLlmContextBuilder::class)->buildPartnershipContext($attachedA, $attachedB, $locale);
+        $partnershipContext = $this->llmContext->buildCompactPartnershipContext(
+            $attachedA,
+            $attachedB,
+            $locale,
+            $options?->normalizedTopics() ?? [],
+        );
 
         $explanation = $this->generateProfileExplanationWithLlm(
-            system: $this->promptBuilder->horoscopePartnershipProfileExplanationSystemPrompt($locale),
-            userPrompt: $this->promptBuilder->horoscopePartnershipProfileExplanationUserPrompt(
-                $attachedA,
-                $attachedB,
-                $partnershipContext,
+            system: $this->promptBuilder->horoscopePartnershipProfileExplanationSystemPrompt($locale, $options),
+            userPrompt: $this->promptBuilder->appendUserFocus(
+                $this->promptBuilder->horoscopePartnershipProfileExplanationUserPrompt(
+                    $attachedA,
+                    $attachedB,
+                    $partnershipContext,
+                    $locale,
+                    $options,
+                ),
+                $options,
                 $locale,
             ),
             user: $user,
             partnership: true,
+            options: $options,
+            locale: $locale,
         );
 
         return $this->storeChartExplanation([
@@ -1100,8 +1174,6 @@ class DailyHoroscopeService
             'birth_chart_id_a' => $firstId,
             'birth_chart_id_b' => $secondId,
             'context_payload' => [
-                'chart_a' => $attachedA,
-                'chart_b' => $attachedB,
                 'partnership' => $partnershipContext,
             ],
             'explanation' => $explanation,
@@ -1114,13 +1186,59 @@ class DailyHoroscopeService
         string $userPrompt,
         ?User $user,
         bool $partnership = false,
+        ?HoroscopeGenerationOptions $options = null,
+        string $locale = 'hu',
     ): string {
-        @set_time_limit($partnership ? 900 : 600);
+        @set_time_limit(900);
 
-        return $this->generateExplanationWithLlm($system, $userPrompt, $user, [
-            'max_tokens' => $partnership ? 24000 : 16000,
-            'timeout' => $partnership ? 600 : 300,
-        ]);
+        return $this->generateExplanationWithLlm(
+            $system,
+            $userPrompt,
+            $user,
+            $this->explanationLlmOptions($partnership, $options, $locale),
+        );
+    }
+
+    /**
+     * @return array{max_tokens: int, timeout: int}
+     */
+    private function explanationLlmOptions(
+        bool $partnership,
+        ?HoroscopeGenerationOptions $options,
+        string $locale,
+    ): array {
+        $detailLevel = $options?->detailLevel ?? HoroscopeGenerationOptions::DETAIL_NORMAL;
+        $sentenceCount = $this->llmConfig->sentenceCount('explanation', $detailLevel, $locale);
+        $maxTokens = $this->estimateExplanationMaxTokens($sentenceCount);
+        $timeout = min(240, max(90, (int) ceil($sentenceCount * 2.5)));
+
+        if ($partnership) {
+            $timeout = min(300, $timeout + 30);
+        }
+
+        return [
+            'max_tokens' => $maxTokens,
+            'timeout' => $timeout,
+        ];
+    }
+
+    private function estimateExplanationMaxTokens(int $sentenceCount): int
+    {
+        $cap = max(1024, (int) config('services.openai.max_output_tokens', 16384));
+        $estimated = ($sentenceCount * 80) + 512;
+
+        return min($cap, max(1500, $estimated));
+    }
+
+    private function explanationFailureMessage(\Illuminate\Http\Client\Response $response): string
+    {
+        $apiMessage = trim((string) data_get($response->json(), 'error.message', ''));
+
+        if ($apiMessage !== '') {
+            return 'A kifejtés generálása sikertelen: '.$apiMessage;
+        }
+
+        return 'A kifejtés generálása sikertelen.';
     }
 
     /**
@@ -1251,9 +1369,12 @@ class DailyHoroscopeService
         if ($user) {
             $usage = (array) ($response->json('usage') ?? []);
             $total = (int) ($usage['total_tokens'] ?? 0);
+            $this->lastTokensUsed = $total;
             if ($total > 0 && $user->token_quota_total > 0) {
                 $user->increment('token_quota_used', $total);
             }
+        } else {
+            $this->lastTokensUsed = (int) ($response->json('usage.total_tokens') ?? 0);
         }
 
         $generated = [
@@ -1290,17 +1411,26 @@ class DailyHoroscopeService
             'timeout' => 90,
         ], $options);
 
-        $response = $this->openAi->chat([
-            ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => $userPrompt],
-        ], null, $options);
+        $response = $this->requestExplanationFromLlm($system, $userPrompt, $options);
+
+        if ($response->failed() && (int) ($options['max_tokens'] ?? 0) > 2500) {
+            $retryOptions = $options;
+            $retryOptions['max_tokens'] = max(1500, (int) floor(((int) $options['max_tokens']) * 0.65));
+            $retryOptions['timeout'] = min((int) ($options['timeout'] ?? 90), 180);
+
+            Log::warning('Horoscope explanation LLM retry with reduced max_tokens', [
+                'max_tokens' => $retryOptions['max_tokens'],
+            ]);
+
+            $response = $this->requestExplanationFromLlm($system, $userPrompt, $retryOptions);
+        }
 
         if ($response->failed()) {
             Log::warning('Horoscope explanation LLM failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
-            throw new \RuntimeException('A kifejtés generálása sikertelen.');
+            throw new \RuntimeException($this->explanationFailureMessage($response));
         }
 
         $content = (string) ($response->json('choices.0.message.content') ?? '');
@@ -1313,9 +1443,12 @@ class DailyHoroscopeService
         if ($user) {
             $usage = (array) ($response->json('usage') ?? []);
             $total = (int) ($usage['total_tokens'] ?? 0);
+            $this->lastTokensUsed = $total;
             if ($total > 0 && $user->token_quota_total > 0) {
                 $user->increment('token_quota_used', $total);
             }
+        } else {
+            $this->lastTokensUsed = (int) ($response->json('usage.total_tokens') ?? 0);
         }
 
         $explanation = trim((string) ($parsed['explanation'] ?? ''));
@@ -1324,6 +1457,17 @@ class DailyHoroscopeService
         }
 
         return $explanation;
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    private function requestExplanationFromLlm(string $system, string $userPrompt, array $options): \Illuminate\Http\Client\Response
+    {
+        return $this->openAi->chat([
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $userPrompt],
+        ], null, $options);
     }
 
     /**
@@ -1346,6 +1490,131 @@ class DailyHoroscopeService
             'chart_payload' => $chartPayload,
             'scores' => $this->scoring->scoreAllPayloads($chartPayload),
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $allScores
+     * @return array<string, mixed>
+     */
+    public function resolvePreviewScoreContext(string $locale, array $allScores): array
+    {
+        $setting = DailyHoroscopeSetting::forLocale($locale);
+        $setting->load('scoringProfile');
+
+        return $this->resolveScoreContext($setting, $allScores);
+    }
+
+    /**
+     * @return array{payload: array<string, mixed>|null, note: string|null}
+     */
+    public function previewAttachedPayloadForUser(User $user, ?int $birthChartId = null): array
+    {
+        $settings = UserDailyHoroscopeSetting::forUser($user);
+        $settings->load(['scoringProfile']);
+        $profile = $settings->resolvedScoringProfile();
+        $chart = $this->resolvePreviewBirthChart($user, $birthChartId);
+
+        if (! $chart) {
+            return [
+                'payload' => null,
+                'note' => __('horoscope.prompt_preview_missing_birth_chart'),
+            ];
+        }
+
+        return [
+            'payload' => $this->buildAttachedPayloadFromBirthChart($user, $chart, $profile),
+            'note' => __('horoscope.prompt_preview_birth_chart', ['name' => $chart->name]),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     payload_a: array<string, mixed>|null,
+     *     payload_b: array<string, mixed>|null,
+     *     note: string|null
+     * }
+     */
+    public function previewPartnershipAttachedPayloadsForUser(
+        User $user,
+        ?int $birthChartIdA = null,
+        ?int $birthChartIdB = null,
+    ): array {
+        $settings = UserDailyHoroscopeSetting::forUser($user);
+        $settings->load(['scoringProfile']);
+        $profile = $settings->resolvedScoringProfile();
+        $charts = $this->resolvePreviewBirthChartPair($user, $birthChartIdA, $birthChartIdB);
+
+        if ($charts === null) {
+            return [
+                'payload_a' => null,
+                'payload_b' => null,
+                'note' => __('horoscope.prompt_preview_missing_two_birth_charts'),
+            ];
+        }
+
+        [$chartA, $chartB] = $charts;
+
+        return [
+            'payload_a' => $this->buildAttachedPayloadFromBirthChart($user, $chartA, $profile),
+            'payload_b' => $this->buildAttachedPayloadFromBirthChart($user, $chartB, $profile),
+            'note' => __('horoscope.prompt_preview_partnership', [
+                'name_a' => $chartA->name,
+                'name_b' => $chartB->name,
+            ]),
+        ];
+    }
+
+    private function resolvePreviewBirthChart(User $user, ?int $birthChartId): ?BirthChart
+    {
+        if ($birthChartId) {
+            $selected = BirthChart::query()
+                ->where('user_id', $user->id)
+                ->whereKey($birthChartId)
+                ->first();
+            if ($selected) {
+                return $selected;
+            }
+        }
+
+        return BirthChart::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->first();
+    }
+
+    /**
+     * @return array{0: BirthChart, 1: BirthChart}|null
+     */
+    private function resolvePreviewBirthChartPair(User $user, ?int $birthChartIdA, ?int $birthChartIdB): ?array
+    {
+        $charts = BirthChart::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
+
+        if ($charts->count() < 2) {
+            return null;
+        }
+
+        $chartA = $birthChartIdA
+            ? $charts->firstWhere('id', $birthChartIdA)
+            : $charts->get(0);
+        $chartB = $birthChartIdB
+            ? $charts->firstWhere('id', $birthChartIdB)
+            : $charts->get(1);
+
+        if (! $chartA || ! $chartB || $chartA->id === $chartB->id) {
+            $chartA = $charts->get(0);
+            $chartB = $charts->get(1);
+        }
+
+        if (! $chartA || ! $chartB || $chartA->id === $chartB->id) {
+            return null;
+        }
+
+        return [$chartA, $chartB];
     }
 
     /**

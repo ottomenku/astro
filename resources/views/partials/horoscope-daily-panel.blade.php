@@ -1,6 +1,6 @@
-<div class="rounded-xl border border-amber-200 bg-amber-50/40 p-5 sm:p-6 space-y-6 relative pt-16" id="horoscopeDailyPanel">
-    <div class="absolute top-4 right-4 left-4 sm:left-auto sm:pl-0 flex flex-wrap items-center justify-end gap-2 max-w-full">
-        <div class="flex flex-wrap justify-end gap-1.5" id="horoscopePeriodTabs">
+<div class="rounded-xl border border-amber-200 bg-amber-50/40 p-5 sm:p-6 space-y-6" id="horoscopeDailyPanel">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap gap-1.5" id="horoscopePeriodTabs">
             @foreach ([\App\Support\HoroscopePeriod::DAILY, \App\Support\HoroscopePeriod::WEEKLY, \App\Support\HoroscopePeriod::MONTHLY] as $periodOption)
                 <button type="button"
                         data-period="{{ $periodOption }}"
@@ -11,12 +11,22 @@
         </div>
     </div>
 
+    @include('partials.horoscope-generation-form', [
+        'type' => 'message',
+        'formId' => 'horoscopeDailyGenerationForm',
+        'focusInputId' => 'horoscopeDailyUserFocus',
+        'detailSelectId' => 'horoscopeDailyDetailLevel',
+        'submitBtnId' => 'horoscopeDailyGenerateBtn',
+        'topicsGroupId' => 'horoscopeDailyTopics',
+    ])
+
     <div class="text-center space-y-2">
+        <p class="hidden text-xs text-amber-800/70" id="horoscopeDailyTokens"></p>
         <p class="hidden text-xs font-semibold uppercase tracking-wide text-amber-700" id="horoscopeDailyBadge"></p>
-        <p class="text-xs text-amber-800/80" id="horoscopeDailyMeta"></p>
+        <p class="hidden text-xs text-amber-800/80" id="horoscopeDailyMeta"></p>
     </div>
 
-    <div class="text-center text-sm text-gray-600" id="horoscopeDailyLoading">{{ __('horoscope.daily_loading') }}</div>
+    <div class="hidden text-center text-sm text-gray-600" id="horoscopeDailyLoading">{{ __('horoscope.daily_loading') }}</div>
     <div class="hidden rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" id="horoscopeDailyError"></div>
 
     <div class="hidden space-y-6" id="horoscopeDailyContent">

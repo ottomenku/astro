@@ -398,6 +398,8 @@
         </div>
     </div>
 
+    @include('partials.horoscope-prompt-admin-modal')
+
     <div id="elementInfoModal" class="hidden fixed inset-0 z-50 overflow-y-auto px-4 py-8" role="dialog" aria-modal="true" aria-labelledby="elementInfoTitle">
         <div id="elementInfoBackdrop" class="fixed inset-0 bg-gray-900/50"></div>
         <div class="relative max-w-lg mx-auto bg-white rounded-lg shadow-xl border border-gray-200">
@@ -630,6 +632,10 @@
             const aspectInfoUrl = '{{ route('horoscope.aspect-info', [], false) }}';
             const horoscopeDailyUrl = '{{ route('horoscope.daily-message', [], false) }}';
             const horoscopeDailyExplanationUrl = '{{ route('horoscope.daily-message.explanation', [], false) }}';
+            const HOROSCOPE_IS_ADMIN = @json((bool) auth()->user()?->is_admin);
+            const horoscopePromptShowUrl = '{{ route('admin.horoscope-prompts.show', [], false) }}';
+            const horoscopePromptUpdateUrl = '{{ route('admin.horoscope-prompts.update', [], false) }}';
+            const HOROSCOPE_LOCALE = @json(app()->getLocale());
             const HOROSCOPE_PERIOD = @json(\App\Support\HoroscopePeriod::normalize(request()->query('period')));
             const horoscopeChatUrl = '{{ route('horoscope.chat', [], false) }}';
             const HOROSCOPE_MODE = @json($horoscopePageMode);
@@ -873,6 +879,15 @@
             const horoscopeExplanationMeta = document.getElementById('horoscopeExplanationMeta');
             const horoscopeExplanationTitle = document.getElementById('horoscopeExplanationTitle');
             const horoscopeExplanationText = document.getElementById('horoscopeExplanationText');
+            const horoscopeDailyUserFocus = document.getElementById('horoscopeDailyUserFocus');
+            const horoscopeDailyDetailLevel = document.getElementById('horoscopeDailyDetailLevel');
+            const horoscopeDailyGenerateBtn = document.getElementById('horoscopeDailyGenerateBtn');
+            const horoscopeDailyTokens = document.getElementById('horoscopeDailyTokens');
+            const horoscopeExplanationUserFocus = document.getElementById('horoscopeExplanationUserFocus');
+            const horoscopeExplanationDetailLevel = document.getElementById('horoscopeExplanationDetailLevel');
+            const horoscopeExplanationGenerateBtn = document.getElementById('horoscopeExplanationGenerateBtn');
+            const horoscopeExplanationTokens = document.getElementById('horoscopeExplanationTokens');
+            const horoscopeExplanationDurationHint = document.getElementById('horoscopeExplanationDurationHint');
             const horoscopePeriodButtons = document.querySelectorAll('.horoscope-period-btn');
             const dualBirthChartSelectA = document.getElementById('dualBirthChartSelectA');
             const dualBirthChartSelectB = document.getElementById('dualBirthChartSelectB');
@@ -889,17 +904,21 @@
             let cachedHoroscopeExplanation = '';
             let horoscopeExplanationRequestSeq = 0;
 
-            function isDualNowBlockingStarsMessage() {
-                return HOROSCOPE_MODE === 'dual' && dualBirthChartSelectB?.value === 'now';
-            }
-
-            function isDualNowBlockingExplanation() {
+            function isDualMissingSavedBirthCharts() {
                 if (HOROSCOPE_MODE !== 'dual') {
                     return false;
                 }
 
                 return !isDualSavedBirthChartSelected(getDualBirthChartSelectA())
                     || !isDualSavedBirthChartSelected(getDualBirthChartSelectB());
+            }
+
+            function isDualNowBlockingStarsMessage() {
+                return isDualMissingSavedBirthCharts();
+            }
+
+            function isDualNowBlockingExplanation() {
+                return isDualMissingSavedBirthCharts();
             }
 
             function isDualSavedBirthChartSelected(selectEl) {
@@ -984,6 +1003,10 @@
                 }
 
                 if (restoreDualChartSelectionFromStorage()) {
+                    if ((activeViewName === 'daily' || activeViewName === 'explanation') && BIRTH_CHARTS.length >= 2) {
+                        ensureDualDailyChartSelection();
+                    }
+                    updateDualNowSteppingVisibility();
                     writeDualChartSelectionToStorage();
                     return;
                 }
@@ -997,7 +1020,10 @@
                     applyDualSelect('a', dualBirthChartSelectA.value);
                 }
 
-                if (dualBirthChartSelectB?.value === '') {
+                const needsSavedPair = activeViewName === 'daily' || activeViewName === 'explanation';
+                if (BIRTH_CHARTS.length >= 2) {
+                    ensureDualDailyChartSelection();
+                } else if (!needsSavedPair && dualBirthChartSelectB?.value === '') {
                     dualBirthChartSelectB.value = 'now';
                 }
 
@@ -1010,20 +1036,13 @@
             }
 
             function updateStarsMessageNavVisibility() {
-                const hideDaily = isDualNowBlockingStarsMessage();
-                const hideExplanation = isDualNowBlockingExplanation();
-
-                horoscopeNavDaily?.classList.toggle('hidden', hideDaily);
-                horoscopeNavExplanation?.classList.toggle('hidden', hideExplanation);
-                horoscopeStarsMessageNav?.classList.toggle('hidden', hideDaily && hideExplanation);
-
-                if ((hideDaily && activeViewName === 'daily')
-                    || (hideExplanation && activeViewName === 'explanation')) {
-                    const chartUrl = HOROSCOPE_MODE === 'dual'
-                        ? '{{ route('horoscope.index', ['mode' => 'dual', 'view' => 'chart'], false) }}'
-                        : '{{ route('horoscope.index', ['view' => 'chart'], false) }}';
-                    window.location.replace(chartUrl);
+                if (HOROSCOPE_MODE !== 'dual') {
+                    return;
                 }
+
+                horoscopeNavDaily?.classList.remove('hidden');
+                horoscopeNavExplanation?.classList.remove('hidden');
+                horoscopeStarsMessageNav?.classList.remove('hidden');
             }
 
             function setHoroscopeDailyPeriod(period) {
@@ -1039,19 +1058,28 @@
 
             function resetHoroscopeExplanationPanel() {
                 resetHoroscopeExplanationCache();
-                horoscopeExplanationLoading?.classList.remove('hidden');
+                horoscopeExplanationLoading?.classList.add('hidden');
                 horoscopeExplanationError?.classList.add('hidden');
                 horoscopeExplanationContent?.classList.add('hidden');
                 horoscopeExplanationBadge?.classList.add('hidden');
                 horoscopeExplanationMeta?.classList.add('hidden');
+                horoscopeExplanationDurationHint?.classList.add('hidden');
+                horoscopeExplanationTokens?.classList.add('hidden');
                 if (horoscopeExplanationText) {
                     horoscopeExplanationText.textContent = '';
                 }
             }
 
+            function beginHoroscopeExplanationLoading() {
+                resetHoroscopeExplanationPanel();
+                horoscopeExplanationLoading?.classList.remove('hidden');
+                horoscopeExplanationDurationHint?.classList.remove('hidden');
+            }
+
             function showHoroscopeExplanationError(message) {
                 horoscopeExplanationLoading?.classList.add('hidden');
                 horoscopeExplanationContent?.classList.add('hidden');
+                horoscopeExplanationDurationHint?.classList.add('hidden');
                 if (horoscopeExplanationError) {
                     horoscopeExplanationError.textContent = message || tr('explanation_error');
                     horoscopeExplanationError.classList.remove('hidden');
@@ -1061,7 +1089,9 @@
             function renderHoroscopeExplanation(data) {
                 horoscopeExplanationLoading?.classList.add('hidden');
                 horoscopeExplanationError?.classList.add('hidden');
+                horoscopeExplanationDurationHint?.classList.add('hidden');
                 horoscopeExplanationContent?.classList.remove('hidden');
+                renderHoroscopeTokensUsed(horoscopeExplanationTokens, data.tokens_used);
 
                 const kind = data.kind || horoscopeDailyMessageKind;
                 if (horoscopeExplanationBadge) {
@@ -1091,6 +1121,11 @@
             }
 
             function buildExplanationNowChartPayload() {
+                if (!natalInputs.date?.value || !natalInputs.time?.value) {
+                    setNowTime();
+                }
+                setDefaultCoords();
+
                 return {
                     datetime_utc: toUtcIso(
                         natalInputs.date.value,
@@ -1102,27 +1137,41 @@
                 };
             }
 
+            function collectHoroscopeTopics(groupId) {
+                return Array.from(document.querySelectorAll(`.horoscope-topic-checkbox[data-topic-group="${groupId}"]:checked`))
+                    .map((input) => input.value)
+                    .filter(Boolean);
+            }
+
+            function horoscopeGenerationOptions(focusInput, detailSelect, topicsGroupId) {
+                return {
+                    user_focus: focusInput?.value?.trim() || '',
+                    detail_level: detailSelect?.value || 'normal',
+                    topics: collectHoroscopeTopics(topicsGroupId),
+                };
+            }
+
             function horoscopeExplanationPayload() {
-                if (HOROSCOPE_MODE === 'dual') {
-                    return {
+                const base = HOROSCOPE_MODE === 'dual'
+                    ? {
                         mode: 'dual',
                         birth_chart_id_a: resolveDualBirthChartId(getDualBirthChartSelectA()),
                         birth_chart_id_b: resolveDualBirthChartId(getDualBirthChartSelectB()),
-                    };
-                }
+                    }
+                    : (isExplanationNowSelected()
+                        ? {
+                            mode: 'single',
+                            is_now: true,
+                            chart: buildExplanationNowChartPayload(),
+                        }
+                        : {
+                            mode: 'single',
+                            birth_chart_id: resolveExplanationBirthChartId(),
+                        });
 
-                if (isExplanationNowSelected()) {
-                    return {
-                        mode: 'single',
-                        is_now: true,
-                        chart: buildExplanationNowChartPayload(),
-                    };
-                }
-
-                const birthChartId = resolveExplanationBirthChartId();
                 return {
-                    mode: 'single',
-                    birth_chart_id: birthChartId,
+                    ...base,
+                    ...horoscopeGenerationOptions(horoscopeExplanationUserFocus, horoscopeExplanationDetailLevel, 'horoscopeExplanationTopics'),
                 };
             }
 
@@ -1141,15 +1190,22 @@
                 return {
                     ...base,
                     period: horoscopeDailyPeriod,
+                    ...horoscopeGenerationOptions(horoscopeDailyUserFocus, horoscopeDailyDetailLevel, 'horoscopeDailyTopics'),
                 };
             }
 
             function resetHoroscopeDailyPanel() {
-                horoscopeDailyLoading?.classList.remove('hidden');
+                horoscopeDailyLoading?.classList.add('hidden');
                 horoscopeDailyError?.classList.add('hidden');
                 horoscopeDailyContent?.classList.add('hidden');
                 horoscopeDailyBadge?.classList.add('hidden');
                 horoscopeDailyMeta?.classList.add('hidden');
+                horoscopeDailyTokens?.classList.add('hidden');
+            }
+
+            function beginHoroscopeDailyLoading() {
+                resetHoroscopeDailyPanel();
+                horoscopeDailyLoading?.classList.remove('hidden');
             }
 
             function showHoroscopeDailyError(message) {
@@ -1161,10 +1217,27 @@
                 }
             }
 
+            function renderHoroscopeTokensUsed(element, tokensUsed) {
+                if (!element) {
+                    return;
+                }
+
+                const count = Number(tokensUsed);
+                if (!Number.isFinite(count) || count <= 0) {
+                    element.classList.add('hidden');
+                    element.textContent = '';
+                    return;
+                }
+
+                element.textContent = tr('generation_tokens_used', { count: String(count) });
+                element.classList.remove('hidden');
+            }
+
             function renderHoroscopeDailyMessage(data) {
                 horoscopeDailyLoading?.classList.add('hidden');
                 horoscopeDailyError?.classList.add('hidden');
                 horoscopeDailyContent?.classList.remove('hidden');
+                renderHoroscopeTokensUsed(horoscopeDailyTokens, data.tokens_used);
 
                 horoscopeDailyMessageKind = data.kind || null;
 
@@ -1194,7 +1267,7 @@
             }
 
             async function loadHoroscopeDailyExplanation() {
-                if (!panelExplanation || activeViewName !== 'explanation') {
+                if (!panelExplanation || panelExplanation.classList.contains('hidden')) {
                     return;
                 }
 
@@ -1215,13 +1288,8 @@
                     return;
                 }
 
-                if (cachedHoroscopeExplanation) {
-                    renderHoroscopeExplanation({ explanation: cachedHoroscopeExplanation, kind: horoscopeDailyMessageKind });
-                    return;
-                }
-
                 const requestId = ++horoscopeExplanationRequestSeq;
-                resetHoroscopeExplanationPanel();
+                beginHoroscopeExplanationLoading();
 
                 try {
                     const response = await fetch(horoscopeDailyExplanationUrl, {
@@ -1259,7 +1327,7 @@
             }
 
             async function loadHoroscopeDailyMessage() {
-                if (!panelDaily || activeViewName !== 'daily') {
+                if (!panelDaily || panelDaily.classList.contains('hidden')) {
                     return;
                 }
 
@@ -1275,7 +1343,7 @@
 
                 const payload = horoscopeDailyPayload();
                 const requestId = ++horoscopeDailyRequestSeq;
-                resetHoroscopeDailyPanel();
+                beginHoroscopeDailyLoading();
 
                 try {
                     const response = await fetch(horoscopeDailyUrl, {
@@ -1337,6 +1405,28 @@
                 ensureDefaultSingleChartSelection();
             }
 
+            function ensureDefaultExplanationChartSelection() {
+                if (HOROSCOPE_MODE === 'dual') {
+                    ensureDualDailyChartSelection();
+                    return;
+                }
+
+                if (!birthChartSelect) {
+                    return;
+                }
+
+                if (birthChartSelect.value === '') {
+                    ensureDefaultSingleChartSelection();
+                }
+
+                if (birthChartSelect.value === 'now') {
+                    applyPreset('current');
+                    return;
+                }
+
+                applyBirthChartSelectValue();
+            }
+
             function canLoadHoroscopeDailyMessage() {
                 const payload = horoscopeDailyPayload();
 
@@ -1348,18 +1438,22 @@
             }
 
             function canLoadHoroscopeExplanation() {
-                const payload = horoscopeExplanationPayload();
+                try {
+                    const payload = horoscopeExplanationPayload();
 
-                if (payload.mode === 'dual') {
-                    return Boolean(payload.birth_chart_id_a && payload.birth_chart_id_b);
+                    if (payload.mode === 'dual') {
+                        return Boolean(payload.birth_chart_id_a && payload.birth_chart_id_b);
+                    }
+
+                    if (payload.is_now) {
+                        const chart = payload.chart || {};
+                        return Boolean(chart.datetime_utc && Number.isFinite(chart.lat) && Number.isFinite(chart.lon));
+                    }
+
+                    return Boolean(payload.birth_chart_id);
+                } catch {
+                    return false;
                 }
-
-                if (payload.is_now) {
-                    const chart = payload.chart || {};
-                    return Boolean(chart.datetime_utc && Number.isFinite(chart.lat) && Number.isFinite(chart.lon));
-                }
-
-                return Boolean(payload.birth_chart_id);
             }
 
             function ensureDualDailyChartSelection() {
@@ -2051,19 +2145,192 @@
                 setTableLabels(tr('natal'), tr('transit'));
             }
 
-            function loadActiveHoroscopeMessageView() {
-                if (activeViewName === 'daily') {
-                    ensureDefaultBirthChartForDaily();
-                    loadHoroscopeDailyMessage();
-                } else if (activeViewName === 'explanation') {
-                    ensureDefaultSingleChartSelection();
-                    loadHoroscopeDailyExplanation();
+            function buildPromptPreviewQuery(context) {
+                const params = new URLSearchParams({
+                    context,
+                    locale: HOROSCOPE_LOCALE,
+                    mode: HOROSCOPE_MODE,
+                    period: horoscopeDailyPeriod || 'daily',
+                });
+
+                if (HOROSCOPE_MODE === 'dual') {
+                    const chartA = resolveDualBirthChartId(getDualBirthChartSelectA());
+                    const chartB = resolveDualBirthChartId(getDualBirthChartSelectB());
+                    if (chartA) {
+                        params.set('birth_chart_id_a', String(chartA));
+                    }
+                    if (chartB) {
+                        params.set('birth_chart_id_b', String(chartB));
+                    }
+                } else {
+                    const chartId = resolveSingleBirthChartId();
+                    if (chartId) {
+                        params.set('birth_chart_id', String(chartId));
+                    }
                 }
+
+                return params.toString();
+            }
+
+            function initHoroscopePromptAdminModal() {
+                if (!HOROSCOPE_IS_ADMIN) {
+                    return;
+                }
+
+                const modal = document.getElementById('horoscopePromptAdminModal');
+                const modalLabel = document.getElementById('horoscopePromptAdminModalLabel');
+                const modalNote = document.getElementById('horoscopePromptAdminModalNote');
+                const modalContent = document.getElementById('horoscopePromptAdminModalContent');
+                const modalSystem = document.getElementById('horoscopePromptAdminModalSystem');
+                const modalUser = document.getElementById('horoscopePromptAdminModalUser');
+                const modalInstructions = document.getElementById('horoscopePromptAdminModalInstructions');
+                const modalLoading = document.getElementById('horoscopePromptAdminModalLoading');
+                const modalError = document.getElementById('horoscopePromptAdminModalError');
+                const modalSuccess = document.getElementById('horoscopePromptAdminModalSuccess');
+                const modalSave = document.getElementById('horoscopePromptAdminModalSave');
+                const modalReset = document.getElementById('horoscopePromptAdminModalReset');
+
+                if (!modal || !modalSystem || !modalUser || !modalInstructions) {
+                    return;
+                }
+
+                let activeContext = null;
+                let defaultInstructions = '';
+
+                function hideModalMessages() {
+                    modalError?.classList.add('hidden');
+                    modalSuccess?.classList.add('hidden');
+                }
+
+                function closePromptModal() {
+                    modal.classList.add('hidden');
+                    hideModalMessages();
+                }
+
+                async function loadPrompt(context) {
+                    activeContext = context;
+                    hideModalMessages();
+                    modalContent?.classList.add('hidden');
+                    modalLoading?.classList.remove('hidden');
+
+                    const response = await fetch(`${horoscopePromptShowUrl}?${buildPromptPreviewQuery(context)}`, {
+                        headers: {
+                            Accept: 'application/json',
+                        },
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    modalLoading?.classList.add('hidden');
+
+                    if (!response.ok) {
+                        if (modalError) {
+                            modalError.textContent = data.message || tr('prompt_settings_error');
+                            modalError.classList.remove('hidden');
+                        }
+                        return;
+                    }
+
+                    defaultInstructions = data.default_instructions_prompt || '';
+                    if (modalLabel) {
+                        modalLabel.textContent = data.label || context;
+                    }
+                    if (modalNote) {
+                        modalNote.textContent = data.preview_note || '';
+                        modalNote.classList.toggle('hidden', !data.preview_note);
+                    }
+                    modalSystem.value = data.system_prompt || '';
+                    modalUser.value = data.user_prompt || '';
+                    modalInstructions.value = data.instructions_prompt || '';
+                    modalContent?.classList.remove('hidden');
+                }
+
+                document.querySelectorAll('.horoscope-prompt-admin-btn').forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        const context = button.dataset.promptContext;
+                        if (!context) {
+                            return;
+                        }
+
+                        modal.classList.remove('hidden');
+                        try {
+                            await loadPrompt(context);
+                        } catch (error) {
+                            modalLoading?.classList.add('hidden');
+                            if (modalError) {
+                                modalError.textContent = error?.message || tr('prompt_settings_error');
+                                modalError.classList.remove('hidden');
+                            }
+                        }
+                    });
+                });
+
+                modal.querySelectorAll('[data-prompt-modal-close], [data-prompt-modal-backdrop]').forEach((element) => {
+                    element.addEventListener('click', closePromptModal);
+                });
+
+                modalReset?.addEventListener('click', () => {
+                    modalInstructions.value = defaultInstructions;
+                    hideModalMessages();
+                });
+
+                modalSave?.addEventListener('click', async () => {
+                    if (!activeContext) {
+                        return;
+                    }
+
+                    hideModalMessages();
+                    modalSave.disabled = true;
+
+                    try {
+                        const response = await fetch(horoscopePromptUpdateUrl, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify({
+                                context: activeContext,
+                                locale: HOROSCOPE_LOCALE,
+                                prompt: modalInstructions.value,
+                            }),
+                        });
+
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(data.message || tr('prompt_settings_error'));
+                        }
+
+                        defaultInstructions = data.default_instructions_prompt || defaultInstructions;
+                        modalInstructions.value = data.instructions_prompt || modalInstructions.value;
+                        await loadPrompt(activeContext);
+                        if (modalSuccess) {
+                            modalSuccess.textContent = tr('prompt_settings_saved');
+                            modalSuccess.classList.remove('hidden');
+                        }
+                    } catch (error) {
+                        if (modalError) {
+                            modalError.textContent = error?.message || tr('prompt_settings_error');
+                            modalError.classList.remove('hidden');
+                        }
+                    } finally {
+                        modalSave.disabled = false;
+                    }
+                });
+            }
+
+            function resetStarsMessagePanels() {
+                resetHoroscopeDailyPanel();
+                resetHoroscopeExplanationPanel();
+            }
+
+            function loadActiveHoroscopeMessageView() {
+                resetStarsMessagePanels();
             }
 
             function reloadActiveStarsMessageView() {
                 resetHoroscopeExplanationCache();
-                loadActiveHoroscopeMessageView();
+                resetStarsMessagePanels();
             }
 
             function initHoroscopePage() {
@@ -2080,11 +2347,26 @@
                         }
 
                         setHoroscopeDailyPeriod(period);
-                        if (activeViewName === 'daily') {
-                            loadHoroscopeDailyMessage();
-                        }
+                        resetHoroscopeDailyPanel();
                     });
                 });
+
+                horoscopeDailyGenerateBtn?.addEventListener('click', () => {
+                    ensureDefaultBirthChartForDaily();
+                    loadHoroscopeDailyMessage();
+                });
+
+                horoscopeExplanationGenerateBtn?.addEventListener('click', () => {
+                    try {
+                        ensureDefaultExplanationChartSelection();
+                        loadHoroscopeDailyExplanation();
+                    } catch (error) {
+                        console.error('Horoscope explanation generate failed:', error);
+                        showHoroscopeExplanationError(error?.message || tr('explanation_error'));
+                    }
+                });
+
+                initHoroscopePromptAdminModal();
 
                 syncHoroscopeViewPanels();
 
@@ -2403,11 +2685,24 @@
             }
 
             function toUtcIso(dateStr, timeStr, offsetHours) {
+                if (!dateStr || !timeStr) {
+                    return '';
+                }
+
                 const [year, month, day] = dateStr.split('-').map(Number);
                 const [hour, minute] = timeStr.split(':').map(Number);
+                if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+                    return '';
+                }
+
                 const localMs = Date.UTC(year, month - 1, day, hour, minute);
                 const utcMs = localMs - offsetHours * 60 * 60 * 1000;
-                return new Date(utcMs).toISOString();
+                const date = new Date(utcMs);
+                if (Number.isNaN(date.getTime())) {
+                    return '';
+                }
+
+                return date.toISOString();
             }
 
             async function geocode(query) {

@@ -125,6 +125,49 @@
                             <p class="mt-1 text-xs text-gray-500">Mentés után a <strong>Kimenő prompt</strong> fül frissül.</p>
                         </div>
 
+                        <div class="border-t border-gray-200 pt-4 space-y-4">
+                            <h3 class="text-sm font-semibold text-gray-800">Horoszkóp generálás – mondatlimitok</h3>
+                            <p class="text-xs text-gray-500">A felhasználói kifejtés és üzenet menük rövid / normál / részletes választója ezeket az értékeket használja.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="space-y-3">
+                                    <p class="text-xs font-medium text-gray-700 uppercase tracking-wide">Kifejtés</p>
+                                    <div>
+                                        <x-input-label for="explanation_sentences_short" value="Rövid (mondat)" />
+                                        <x-text-input id="explanation_sentences_short" name="explanation_sentences_short" type="number" min="5" max="500"
+                                                      class="mt-1 block w-full" :value="old('explanation_sentences_short', $setting->explanation_sentences_short ?? 20)" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="explanation_sentences_normal" value="Normál (mondat)" />
+                                        <x-text-input id="explanation_sentences_normal" name="explanation_sentences_normal" type="number" min="5" max="500"
+                                                      class="mt-1 block w-full" :value="old('explanation_sentences_normal', $setting->explanation_sentences_normal ?? 50)" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="explanation_sentences_detailed" value="Részletes (mondat)" />
+                                        <x-text-input id="explanation_sentences_detailed" name="explanation_sentences_detailed" type="number" min="5" max="500"
+                                                      class="mt-1 block w-full" :value="old('explanation_sentences_detailed', $setting->explanation_sentences_detailed ?? 100)" />
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <p class="text-xs font-medium text-gray-700 uppercase tracking-wide">Üzenet</p>
+                                    <div>
+                                        <x-input-label for="message_sentences_short" value="Rövid (mondat)" />
+                                        <x-text-input id="message_sentences_short" name="message_sentences_short" type="number" min="5" max="500"
+                                                      class="mt-1 block w-full" :value="old('message_sentences_short', $setting->message_sentences_short ?? 20)" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="message_sentences_normal" value="Normál (mondat)" />
+                                        <x-text-input id="message_sentences_normal" name="message_sentences_normal" type="number" min="5" max="500"
+                                                      class="mt-1 block w-full" :value="old('message_sentences_normal', $setting->message_sentences_normal ?? 50)" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="message_sentences_detailed" value="Részletes (mondat)" />
+                                        <x-text-input id="message_sentences_detailed" name="message_sentences_detailed" type="number" min="5" max="500"
+                                                      class="mt-1 block w-full" :value="old('message_sentences_detailed', $setting->message_sentences_detailed ?? 100)" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <button type="submit"
                                 class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                             Beállítások mentése
