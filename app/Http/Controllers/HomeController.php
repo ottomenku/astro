@@ -27,9 +27,8 @@ class HomeController extends Controller
             report($exception);
 
             if ($exception instanceof \Illuminate\Database\QueryException
-                && (str_contains($exception->getMessage(), 'period_type')
-                    || str_contains($exception->getMessage(), 'period_start')
-                    || str_contains($exception->getMessage(), 'horoscope_daily_messages'))) {
+                && (str_contains($exception->getMessage(), 'Unknown column')
+                    || str_contains($exception->getMessage(), "doesn't exist"))) {
                 $error = __('horoscope.schema_outdated');
             } else {
                 $error = __('daily.error');

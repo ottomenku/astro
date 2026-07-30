@@ -530,9 +530,8 @@ class HoroscopeController extends Controller
     {
         if ($error instanceof QueryException) {
             $details = $error->getMessage();
-            if (str_contains($details, 'horoscope_daily_messages')
-                || str_contains($details, 'period_type')
-                || str_contains($details, 'period_start')) {
+            if (str_contains($details, 'Unknown column')
+                || str_contains($details, "doesn't exist")) {
                 Log::error('Horoscope schema mismatch', ['error' => $details]);
 
                 return __('horoscope.schema_outdated');
