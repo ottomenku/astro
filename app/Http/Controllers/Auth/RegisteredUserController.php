@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\SiteMode;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,8 +19,12 @@ class RegisteredUserController extends Controller
     /**
      * Display the registration view.
      */
-    public function create(): View
+    public function create(): View|RedirectResponse
     {
+        if (SiteMode::isPublic()) {
+            return redirect()->route('home', ['auth' => 'register']);
+        }
+
         return view('auth.register');
     }
 
@@ -46,6 +51,10 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('horoscope.index', absolute: false));
+        $default = SiteMode::isExpert()
+            ? route('horoscope.index', absolute: false)
+            : route('message.index', absolute: false);
+
+        return redirect($default);
     }
 }

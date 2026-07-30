@@ -13,10 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'expert.access' => \App\Http\Middleware\EnsureExpertSiteAccess::class,
         ]);
 
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
+            \App\Http\Middleware\EnsureExpertSiteAccess::class,
             \App\Http\Middleware\CheckBannedIp::class,
             \App\Http\Middleware\TrackSiteVisitor::class,
             \App\Http\Middleware\LogPageVisit::class,

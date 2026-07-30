@@ -12,6 +12,7 @@ use App\Services\ChatService;
 use App\Services\DailyHoroscopeService;
 use App\Support\HoroscopeGenerationOptions;
 use App\Support\HoroscopePeriod;
+use App\Support\SiteMode;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -41,6 +42,7 @@ class HoroscopeController extends Controller
                 'is_default' => $chart->is_default,
                 'gender' => $chart->gender,
             ])->values(),
+            'simpleLayout' => SiteMode::isPublic(),
         ]);
     }
 

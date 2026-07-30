@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'personal_message_btn' => 'Personal message',
+    'auth_modal_title' => 'Sign in or register',
+    'close' => 'Close',
+    'page_title' => 'What the stars say',
+    'generate_btn' => 'Create personalized message',
+    'more_options_btn' => 'More options',
+    'menu_horoscope' => 'Horoscope',
+    'menu_tables' => 'Tables',
+    'menu_dual' => 'Dual horoscope',
+    'menu_settings' => 'Settings',
+    'menu_birth_charts' => 'Birth data',
+    'menu_logout' => 'Log out',
+    'birth_chart_required_title' => 'Birth data required',
+    'birth_chart_required_text' => 'Add at least one birth chart to receive a personalized message.',
+    'birth_chart_add_btn' => 'Add birth data',
+    'select_birth_chart' => 'Birth chart',
+    'loading' => 'Generating message…',
+    'error' => 'Message generation failed.',
+    'back_home' => 'Home',
+    'setup_hint' => 'Choose your settings or keep the defaults, then click “Create personalized message”.',
+    'focus_placeholder' => 'E.g. I need help with a relationship decision… or I would like to know if this is a good time to take risks…',
+];

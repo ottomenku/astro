@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\PersonalMessageController;
 use App\Http\Controllers\ProfileBirthChartController;
 use App\Http\Controllers\ProfileDailyHoroscopeController;
 use App\Http\Controllers\ProfileHoroscopeController;
@@ -23,6 +24,10 @@ use Illuminate\Support\Facades\Route;
 Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/uzenet', [PersonalMessageController::class, 'index'])->name('message.index');
+});
 
 Route::get('/dashboard', function () {
     return redirect()->route('horoscope.index');

@@ -13,7 +13,15 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm rounded-lg">
                 <div class="p-6">
-                    @include('partials.app-icon-toolbar')
+                    @if (empty($simpleLayout))
+                        @include('partials.app-icon-toolbar')
+                    @else
+                        <div class="flex items-center justify-between gap-3 mb-4">
+                            <a href="{{ route('message.index') }}" class="text-sm text-indigo-600 hover:text-indigo-800">&larr; {{ __('public.page_title') }}</a>
+                            <button type="button" id="openSimpleHamburgerBtn" class="text-sm font-medium text-gray-700 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50">{{ __('public.more_options_btn') }}</button>
+                        </div>
+                        @include('partials.simple-hamburger-menu')
+                    @endif
                     @include('partials.horoscope-subnav')
 
                     <div class="hidden mt-3 p-3 rounded border border-red-200 bg-red-50 text-red-800 whitespace-pre-wrap" id="errorBox"></div>

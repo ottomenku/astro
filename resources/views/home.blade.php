@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ __('daily.page_title') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
@@ -89,21 +90,14 @@
             color: rgb(254 249 195);
         }
 
-        .home-horoscope-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.35rem;
+        .home-locale-select {
+            padding: 0.35rem 0.5rem;
             border-radius: 9999px;
-            border: 1px solid rgba(250, 204, 21, 0.45);
+            border: 1px solid rgba(250, 204, 21, 0.35);
+            background: rgba(0, 0, 0, 0.4);
             color: rgb(254 240 138);
-            transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-        }
-
-        .home-horoscope-btn:hover {
-            background: rgba(250, 204, 21, 0.15);
-            border-color: rgb(250 204 21);
-            color: rgb(254 249 195);
+            font-size: 0.75rem;
+            line-height: 1.25rem;
         }
     </style>
 </head>
@@ -188,6 +182,16 @@
         @endif
     </div>
 </div>
+
+@include('partials.auth-modal', ['open' => request('auth')])
+
+<script>
+    document.querySelectorAll('.open-personal-message-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
+        });
+    });
+</script>
 
 </body>
 </html>

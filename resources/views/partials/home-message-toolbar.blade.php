@@ -8,14 +8,14 @@
         @endforeach
     </div>
 
+    @include('partials.locale-select', [
+        'id' => 'homeLocaleSelect',
+        'selectClass' => 'home-locale-select',
+    ])
+
     @auth
-        <a href="{{ route('horoscope.index') }}"
-           class="home-horoscope-btn"
-           title="{{ __('app.horoscope') }}"
-           aria-label="{{ __('app.horoscope') }}">
-            @include('partials.icons.horoscope-wheel', ['class' => 'h-5 w-5'])
-        </a>
+        <a href="{{ route('message.index') }}" class="home-login-btn">{{ __('public.personal_message_btn') }}</a>
     @else
-        <a href="{{ route('login') }}" class="home-login-btn">{{ __('daily.login') }}</a>
+        <button type="button" class="home-login-btn open-personal-message-btn">{{ __('public.personal_message_btn') }}</button>
     @endauth
 </div>

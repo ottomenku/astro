@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'personal_message_btn' => 'Személyes üzenet',
+    'auth_modal_title' => 'Belépés vagy regisztráció',
+    'close' => 'Bezárás',
+    'page_title' => 'Mit üzennek a csillagok',
+    'generate_btn' => 'Személyre szabott üzenet készítése',
+    'more_options_btn' => 'Egyéb lehetőségek',
+    'menu_horoscope' => 'Horoszkóp',
+    'menu_tables' => 'Táblázat',
+    'menu_dual' => 'Páros horoszkóp',
+    'menu_settings' => 'Beállítások',
+    'menu_birth_charts' => 'Születési adatok',
+    'menu_logout' => 'Kilépés',
+    'birth_chart_required_title' => 'Születési adat szükséges',
+    'birth_chart_required_text' => 'A személyre szabott üzenethez add meg legalább egy születési adatot.',
+    'birth_chart_add_btn' => 'Születési adat megadása',
+    'select_birth_chart' => 'Születési adat',
+    'loading' => 'Az üzenet készül…',
+    'error' => 'Az üzenet generálása sikertelen.',
+    'back_home' => 'Kezdőlap',
+    'setup_hint' => 'Állítsd be, milyen beállítást szeretnél, vagy hagyd alapértelmezésen, és kattints a „Személyre szabott üzenet készítése” gombra.',
+    'focus_placeholder' => 'Pl. párkapcsolati döntési helyzetben kérek segítséget… vagy szeretném tudni, hogy alkalmas-e ez az időszak kockázatvállalásra…',
+];

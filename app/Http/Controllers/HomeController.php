@@ -4,13 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Services\DailyHoroscopeService;
 use App\Support\HoroscopePeriod;
+use App\Support\SiteMode;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class HomeController extends Controller
 {
-    public function index(Request $request, DailyHoroscopeService $dailyHoroscope): View
+    public function index(Request $request, DailyHoroscopeService $dailyHoroscope): View|RedirectResponse
     {
+        if (SiteMode::isExpert()) {
+            return redirect()->route('horoscope.index');
+        }
+
         $period = HoroscopePeriod::normalize($request->query('period'));
         $message = null;
         $error = null;
