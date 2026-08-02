@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\HoroscopePeriod;
 use App\Support\SiteMode;
+use App\Support\UiTemplate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,7 +26,7 @@ class PersonalMessageController extends Controller
         $period = HoroscopePeriod::normalize($request->query('period'));
         $defaultChart = $birthCharts->firstWhere('is_default', true) ?? $birthCharts->first();
 
-        return view('personal-message.index', [
+        return UiTemplate::render('personal-message', [
             'birthCharts' => $birthCharts,
             'birthChartsJson' => $birthCharts->map(fn ($chart) => [
                 'id' => $chart->id,

@@ -2,8 +2,7 @@
     <div class="py-4">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm rounded-lg p-6 text-gray-900">
-                @include('partials.app-icon-toolbar')
-                @include('partials.admin-icon-toolbar')
+                @include('admin.partials.header')
 
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>

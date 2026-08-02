@@ -2,9 +2,7 @@
     <div class="py-4">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm rounded-lg p-6 sm:p-8">
-                @include('partials.app-icon-toolbar')
-                @include('partials.admin-icon-toolbar')
-                @include('admin.partials.nav')
+                @include('admin.partials.header')
 
                 <header class="mb-6">
                     <h1 class="text-lg font-semibold text-gray-900">{{ __('horoscope.chart_display_admin_title') }}</h1>

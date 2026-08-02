@@ -10,12 +10,14 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatThreadController;
 use App\Http\Controllers\HoroscopeController;
 use App\Http\Controllers\HoroscopeToolsController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminAstrologyEntryController;
 use App\Http\Controllers\Admin\AdminConversationController;
 use App\Http\Controllers\Admin\AdminChartDisplayController;
 use App\Http\Controllers\Admin\AdminDailyHoroscopeController;
 use App\Http\Controllers\Admin\AdminHoroscopePromptController;
 use App\Http\Controllers\Admin\AdminPageVisitController;
+use App\Http\Controllers\Admin\AdminTemplateController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminVisitorController;
 use App\Http\Controllers\ProfileController;
@@ -71,6 +73,8 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('index');
+
     Route::get('/visitors', [AdminVisitorController::class, 'index'])->name('visitors.index');
     Route::patch('/visitors/{visitor}/ban', [AdminVisitorController::class, 'ban'])->name('visitors.ban');
     Route::patch('/visitors/{visitor}/unban', [AdminVisitorController::class, 'unban'])->name('visitors.unban');
@@ -101,6 +105,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/chart-display', [AdminChartDisplayController::class, 'edit'])->name('chart-display.edit');
     Route::put('/chart-display', [AdminChartDisplayController::class, 'update'])->name('chart-display.update');
+
+    Route::get('/templates', [AdminTemplateController::class, 'index'])->name('templates.index');
+    Route::put('/templates', [AdminTemplateController::class, 'update'])->name('templates.update');
 });
 
 require __DIR__.'/auth.php';

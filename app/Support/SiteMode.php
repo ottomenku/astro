@@ -43,4 +43,11 @@ class SiteMode
     {
         return rtrim((string) config('sites.public_url'), '/').'/'.ltrim($path, '/');
     }
+
+    public static function canUseAdminUi(?\App\Models\User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        return (bool) $user?->is_admin;
+    }
 }

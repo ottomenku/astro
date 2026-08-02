@@ -46,7 +46,7 @@
                aria-label="{{ __('horoscope.stars_message_tab') }}">
                 {{ __('horoscope.stars_message_tab') }}
             </a>
-            @if (Auth::user()?->is_admin)
+            @if (\App\Support\SiteMode::canUseAdminUi())
                 <button type="button"
                         class="{{ $promptBtn }} horoscope-prompt-admin-btn"
                         data-prompt-context="{{ $messagePromptContext }}"
@@ -67,7 +67,7 @@
                aria-label="{{ __('horoscope.explanation_tab') }}">
                 {{ __('horoscope.explanation_tab') }}
             </a>
-            @if (Auth::user()?->is_admin)
+            @if (\App\Support\SiteMode::canUseAdminUi())
                 <button type="button"
                         class="{{ $promptBtn }} horoscope-prompt-admin-btn"
                         id="horoscopePromptAdminExplanationBtn"

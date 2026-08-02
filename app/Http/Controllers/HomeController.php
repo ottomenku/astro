@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\DailyHoroscopeService;
 use App\Support\HoroscopePeriod;
 use App\Support\SiteMode;
+use App\Support\UiTemplate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -35,7 +36,7 @@ class HomeController extends Controller
             }
         }
 
-        return view('home', [
+        return UiTemplate::render('home', [
             'daily' => $message,
             'error' => $error,
             'period' => $period,

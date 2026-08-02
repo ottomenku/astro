@@ -1,4 +1,4 @@
-@if (Auth::user()?->is_admin)
+@if (\App\Support\SiteMode::canUseAdminUi())
 <div id="horoscopePromptAdminModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true" role="dialog">
     <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
         <div class="fixed inset-0 bg-gray-500/75 transition-opacity" data-prompt-modal-backdrop></div>

@@ -46,13 +46,8 @@
             font-weight: 600;
         }
 
-        .pm-more-options-btn:hover:not(:disabled) {
+        .pm-more-options-btn:hover {
             background: rgba(255, 255, 255, 0.14);
-        }
-
-        .pm-more-options-btn:disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
         }
 
         .pm-action-row {
@@ -127,7 +122,7 @@
 <div class="max-w-2xl mx-auto px-5 py-6 sm:py-8 min-h-screen flex flex-col">
     <div class="pm-top-row">
         <p class="pm-setup-hint">{{ __('public.setup_hint') }}</p>
-        <button type="button" id="openSimpleHamburgerBtn" class="pm-chip-btn pm-more-options-btn" disabled aria-disabled="true">
+        <button type="button" id="openSimpleHamburgerBtn" class="pm-chip-btn pm-more-options-btn">
             {{ __('public.more_options_btn') }}
         </button>
     </div>

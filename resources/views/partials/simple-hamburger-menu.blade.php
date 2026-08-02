@@ -10,8 +10,14 @@
         <a href="{{ route('horoscope.index') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('public.menu_horoscope') }}</a>
         <a href="{{ route('horoscope.index', ['view' => 'tables']) }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('public.menu_tables') }}</a>
         <a href="{{ route('horoscope.index', ['mode' => 'dual', 'view' => 'chart']) }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('public.menu_dual') }}</a>
-        <a href="{{ route('profile.horoscope.edit') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('public.menu_settings') }}</a>
-        <a href="{{ route('profile.birth-charts.index') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('public.menu_birth_charts') }}</a>
+
+        <div class="pt-3 mt-2 border-t border-gray-200">
+            <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ __('public.menu_settings_section') }}</p>
+            <a href="{{ route('profile.horoscope.edit') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('app.profile_horoscope') }}</a>
+            <a href="{{ route('profile.daily-horoscope.edit') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('app.profile_daily_horoscope') }}</a>
+            <a href="{{ route('profile.birth-charts.index') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('app.profile_birth_charts') }}</a>
+            <a href="{{ route('profile.edit') }}" class="block py-3 px-2 rounded hover:bg-gray-100 text-sm font-medium">{{ __('app.profile_account') }}</a>
+        </div>
 
         <form method="POST" action="{{ route('logout') }}" class="mt-auto pt-4 border-t border-gray-200">
             @csrf

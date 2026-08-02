@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <g stroke="#E7B64B" stroke-width="2" opacity=".95">
+    <circle cx="200" cy="200" r="190"/><circle cx="200" cy="200" r="148"/><circle cx="200" cy="200" r="92"/>
+    <path d="M200 10v138M295 35 226 155M365 105 245 174M390 200H252M365 295 245 226M295 365 226 245M200 390V252M105 365 174 245M35 295 155 226M10 200h138M35 105l120 69M105 35l69 120"/>
+  </g>
+  <g fill="#F1BA3F" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" font-size="31" text-anchor="middle" dominant-baseline="middle">
+    <text x="200" y="31">&#x2648;&#xFE0E;</text><text x="285" y="54">&#x2649;&#xFE0E;</text><text x="347" y="116">&#x264A;&#xFE0E;</text><text x="370" y="200">&#x264B;&#xFE0E;</text>
+    <text x="347" y="285">&#x264C;&#xFE0E;</text><text x="285" y="347">&#x264D;&#xFE0E;</text><text x="200" y="370">&#x264E;&#xFE0E;</text><text x="115" y="347">&#x264F;&#xFE0E;</text>
+    <text x="53" y="285">&#x2650;&#xFE0E;</text><text x="30" y="200">&#x2651;&#xFE0E;</text><text x="53" y="116">&#x2652;&#xFE0E;</text><text x="115" y="54">&#x2653;&#xFE0E;</text>
+  </g>
+  <g fill="#E7B64B">
+    <circle cx="200" cy="108" r="4"/><circle cx="247" cy="121" r="4"/><circle cx="277" cy="158" r="4"/><circle cx="282" cy="218" r="4"/><circle cx="246" cy="273" r="4"/><circle cx="181" cy="288" r="4"/><circle cx="136" cy="254" r="4"/><circle cx="112" cy="203" r="4"/><circle cx="135" cy="145" r="4"/>
+  </g>
+  <g stroke="#E7B64B" stroke-width="2" opacity=".82">
+    <path d="m200 108 77 50-141 96 111-133-1 152-134-70 170 15-147-73 46 143Z"/>
+  </g>
+</svg>

@@ -13,6 +13,7 @@ use App\Services\DailyHoroscopeService;
 use App\Support\HoroscopeGenerationOptions;
 use App\Support\HoroscopePeriod;
 use App\Support\SiteMode;
+use App\Support\UiTemplate;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -29,7 +30,7 @@ class HoroscopeController extends Controller
 
         $birthCharts = $user?->birthCharts()->orderByDesc('is_default')->orderBy('name')->get() ?? collect();
 
-        return view('horoscope', [
+        return UiTemplate::render('horoscope', [
             'birthCharts' => $birthCharts,
             'birthChartsJson' => $birthCharts->map(fn ($chart) => [
                 'id' => $chart->id,

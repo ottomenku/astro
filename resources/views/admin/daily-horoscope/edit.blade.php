@@ -2,8 +2,7 @@
     <div class="py-4" x-data="{ tab: @js($activeTab) }">
         <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
             <div class="bg-white shadow-sm rounded-lg p-6">
-                @include('partials.app-icon-toolbar')
-                @include('partials.admin-icon-toolbar')
+                @include('admin.partials.header')
 
                 <div class="flex flex-wrap items-center justify-between gap-3 mt-2 mb-4">
                     <div class="text-sm text-gray-600">

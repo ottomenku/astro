@@ -21,9 +21,9 @@
                     <x-nav-link :href="route('chat.index')" :active="request()->routeIs('chat.*')">
                         Chat
                     </x-nav-link>
-                    @if (Auth::user()?->is_admin)
-                        <x-nav-link :href="route('admin.visitors.index')" :active="request()->routeIs('admin.*')">
-                            Admin
+                    @if (\App\Support\SiteMode::canUseAdminUi())
+                        <x-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.*')">
+                            {{ __('app.admin') }}
                         </x-nav-link>
                     @endif
                 </div>
@@ -87,9 +87,9 @@
             <x-responsive-nav-link :href="route('chat.index')" :active="request()->routeIs('chat.*')">
                 Chat
             </x-responsive-nav-link>
-            @if (Auth::user()?->is_admin)
-                <x-responsive-nav-link :href="route('admin.visitors.index')" :active="request()->routeIs('admin.*')">
-                    Admin
+            @if (\App\Support\SiteMode::canUseAdminUi())
+                <x-responsive-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.*')">
+                    {{ __('app.admin') }}
                 </x-responsive-nav-link>
             @endif
         </div>

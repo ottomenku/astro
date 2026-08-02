@@ -6,7 +6,7 @@
         : null;
 @endphp
 
-<div class="relative flex flex-wrap gap-2 pb-2 items-center" x-data="{ menuOpen: false, adminOpen: false }">
+<div class="relative flex flex-wrap gap-2 pb-2 items-center" x-data="{ menuOpen: false }">
     <a href="{{ route('home') }}"
        class="{{ request()->routeIs('home') ? $iconBtnActive : $iconBtn }}"
        title="{{ __('app.homepage') }}"
@@ -43,23 +43,18 @@
     <div class="ml-auto flex flex-wrap gap-2 items-center">
         @include('partials.locale-select')
 
-        @if (Auth::user()?->is_admin)
-            <div class="relative">
-                <button type="button"
-                        class="{{ request()->routeIs('admin.*') ? $iconBtnActive : $iconBtn }} min-w-[2.5rem] font-bold text-lg leading-none"
-                        @click="adminOpen = !adminOpen; menuOpen = false"
-                        :aria-expanded="adminOpen"
-                        title="{{ __('app.admin') }}"
-                        aria-label="{{ __('app.admin') }}">
-                    A
-                </button>
-                @include('partials.admin-menu-dropdown')
-            </div>
+        @if (\App\Support\SiteMode::canUseAdminUi())
+            <a href="{{ route('admin.index') }}"
+               class="{{ request()->routeIs('admin.*') ? $iconBtnActive : $iconBtn }} min-w-[2.5rem] font-bold text-lg leading-none"
+               title="{{ __('app.admin') }}"
+               aria-label="{{ __('app.admin') }}">
+                A
+            </a>
         @endif
 
         <button type="button"
                 class="{{ $iconBtn }}"
-                @click="menuOpen = !menuOpen; adminOpen = false"
+                @click="menuOpen = !menuOpen"
                 :aria-expanded="menuOpen"
                 aria-label="{{ __('app.menu') }}">
             <svg class="h-5 w-5" stroke="currentColor" fill="none" viewBox="0 0 24 24" aria-hidden="true">
